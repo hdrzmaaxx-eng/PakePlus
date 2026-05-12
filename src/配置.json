@@ -1,0 +1,10 @@
+{
+  "hub_apiVersion": "old",
+  "hub_alapi_baseUrl": "https://v3.alapi.cn",
+  "hub_alapi_apiPath": "/api/ai/images/generations_sync",
+  "hub_alapi_modelName": "gpt-image-2",
+  "hub_alapi_apiKey": "cabzw13hcy3zftx5zmamw9c49rascl",
+  "hub_imgbbApiKey": "aee661c0208cf5a9fc70dc7c03691006",
+  "hub_cloudApiKey": "",
+  "hub_cloudBinId": ""
+}
