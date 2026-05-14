@@ -1,0 +1,2366 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI IMG HUB</title>
+    <style>
+        :root {
+            /* 颜色系统 */
+            --bg-body: #f0f4f9; 
+            --bg-panel: #ffffff;
+            --border-color: #e5e7eb;
+            --text-main: #1f2937;
+            --text-muted: #6b7280;
+            --primary-blue: #1a73e8;
+            --primary-hover: #1557b0;
+            --user-bubble: #e3effd;
+            --ai-bubble: #ffffff;
+            --input-bg: #f8f9fa;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+
+/* 修改后：使用 vw 和 vh 强制锁定物理屏幕尺寸 */
+html, body { width: 100vw; height: 100vh; margin: 0; padding: 0; overflow: hidden; }
+body { background-color: var(--bg-body); color: var(--text-main); display: flex; }
+
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.15); border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: rgba(0,0,0,0.3); }
+
+        /* ================= 左侧边栏 ================= */
+        .sidebar { width: 360px; background: var(--bg-panel); border-right: 1px solid var(--border-color); display: flex; flex-direction: column; flex-shrink: 0; z-index: 10; transition: width 0.3s ease, padding 0.3s ease; overflow-x: hidden; }
+        .sidebar.collapsed { width: 0 !important; border-right: none; }
+        
+        .resizer { width: 4px; cursor: col-resize; background-color: transparent; transition: background 0.2s; z-index: 10; }
+        .resizer:hover, .resizer:active { background-color: #d1d5db; }
+        .resizer.collapsed { display: none; }
+
+        .header { padding: 24px; border-bottom: 1px solid var(--border-color); min-width: 360px; display: flex; justify-content: space-between; align-items: center;}
+        .header h1 { font-size: 20px; font-weight: 700; display: flex; align-items: center; gap: 8px; letter-spacing: -0.5px;}
+        
+        .config-area { flex: 1; overflow-y: auto; padding: 24px; min-width: 360px; }
+        .section-title { font-size: 14px; font-weight: 600; margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center; color: var(--text-muted); }
+        .save-btn { font-size: 12px; color: var(--primary-blue); cursor: pointer; font-weight: 500; }
+        .save-btn:hover { text-decoration: underline; }
+
+        .form-group { margin-bottom: 18px; }
+        .form-group label { display: block; font-size: 13px; font-weight: 500; margin-bottom: 8px; color: var(--text-main); }
+        .form-group input, .form-group select { 
+            width: 100%; padding: 10px 12px; border: 1px solid #d1d5db; 
+            border-radius: 8px; background: #fff; font-size: 14px; 
+            color: var(--text-main); outline: none; transition: border-color 0.2s; 
+        }
+        .form-group input:focus, .form-group select:focus { border-color: var(--primary-blue); box-shadow: 0 0 0 2px rgba(26,115,232,0.1); }
+
+        .btn-sync { flex: 1; text-align: center; padding: 10px; border-radius: 6px; font-size: 13px; font-weight: 600; cursor: pointer; color: white; transition: opacity 0.2s; }
+        .btn-sync:hover { opacity: 0.85; }
+        .btn-sync.up { background: var(--primary-blue); }
+        .btn-sync.down { background: #10b981; }
+
+        .sidebar.collapsed .header, .sidebar.collapsed .config-area { display: none; }
+
+
+
+/* ================= 小窗口适配 3：气泡侧边吸附（优化放大版） ================= */
+        .edit-msg-btn {
+            flex-shrink: 0;
+            font-size: 18px; /* ⬅️ 从原来的 12px 放大到了 16px，更加醒目 */
+            color: #9ca3af;
+            background: transparent;
+            cursor: pointer;
+            margin-right: 4px;
+            margin-top: 10px; /* 调整顶部对齐，使其与第一行文字齐平 */
+            padding: 4px 6px; /* 加大了手指的触控判定区域 */
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: color 0.2s, transform 0.1s; /* 增加了形变过渡动画 */
+            user-select: none;
+        }
+        
+        /* 增加移动端触摸及鼠标悬停时的视觉反馈 */
+        .edit-msg-btn:hover, .edit-msg-btn:active {
+            color: var(--primary-blue);
+            transform: scale(1.3); /* 点击/悬停时图标会有个轻微放大的 Q弹反馈 */
+        }
+
+        /* 针对极窄窗口的极限压缩优化 */
+        @media (max-width: 600px) {
+            .edit-msg-btn {
+                font-size: 16px; /* ⬅️ 移动端也从原来的 12px 放大到了 14px */
+                margin-right: 2px; 
+                margin-top: 10px;
+                padding: 4px;
+            }
+            .message-row.user-msg {
+                gap: 8px; /* 缩小气泡和头像的间距，给放大的编辑按钮让路 */
+            }
+        }
+
+
+
+        /* ================= 右侧主聊天区 ================= */
+        /* 修改后：增加 width: 100% 强制撑开 Flex 剩余空间 */
+.main-content { flex: 1; width: 100%; display: flex; flex-direction: column; position: relative; min-width: 400px; background: var(--bg-body); }
+        
+        .chat-top-bar { padding: 12px 24px; display: flex; justify-content: space-between; align-items: center; flex-shrink: 0; position: relative; }
+        
+.current-api-display { position: absolute; left: 50%; transform: translateX(-50%); font-size: 13px; font-weight: 500; color: var(--text-muted); }
+
+        .sidebar-toggle-btn { cursor: pointer; display: flex; align-items: center; justify-content: center; color: var(--text-muted); padding: 4px; border-radius: 4px; transition: background 0.2s; margin-left: -4px;}
+        .sidebar-toggle-btn:hover { background: #e5e7eb; color: var(--text-main); }
+        #sidebar-inside-btn { margin-left: 0; }
+
+        .sidebar.collapsed #sidebar-inside-btn { display: none; }
+        .sidebar:not(.collapsed) ~ .main-content .chat-top-bar .sidebar-toggle-btn { display: none; }
+
+        .clear-history-btn { font-size: 13px; color: var(--text-muted); cursor: pointer; padding: 4px 12px; border-radius: 20px; transition: all 0.2s; border: 1px solid transparent; margin-left: auto; }
+        .clear-history-btn:hover { color: #dc2626; border-color: #fca5a5; background: #fef2f2; }
+
+        .chat-history { flex: 1; overflow-y: auto; padding: 20px 10% 40px; display: flex; flex-direction: column; gap: 32px; }
+        
+        .history-block { display: flex; flex-direction: column; gap: 32px; width: 100%; }
+        .message-row { display: flex; width: 100%; gap: 16px; }
+        .message-row.user-msg { justify-content: flex-end; }
+        .message-row.ai-msg { justify-content: flex-start; }
+
+        .avatar { width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: 600; flex-shrink: 0; }
+        .user-msg .avatar { background: var(--primary-blue); color: #fff; }
+        .ai-msg .avatar { background: var(--primary-blue); border: none; color: #fff; background-image: none; }
+
+        .bubble { max-width: 85%; font-size: 15px; line-height: 1.6; }
+        .user-msg .bubble { background: var(--user-bubble); padding: 12px 16px; border-radius: 16px 4px 16px 16px; color: var(--text-main); word-break: break-all; }
+        .ai-msg .bubble { background: transparent; padding: 0; width: 100%; }
+        
+        .bubble-text { margin-bottom: 12px; }
+        .bubble-images-sent { display: flex; gap: 8px; margin-bottom: 8px; flex-wrap: wrap;}
+        .bubble-images-sent img { width: 60px; height: 60px; object-fit: cover; border-radius: 8px; border: 1px solid rgba(0,0,0,0.1); cursor: zoom-in; }
+
+        .image-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; width: 100%; }
+        .image-card { background: var(--bg-panel); padding: 8px; border-radius: 12px; border: 1px solid var(--border-color); box-shadow: 0 2px 8px rgba(0,0,0,0.02); display: flex; flex-direction: column; gap: 8px; position: relative; }
+        .image-card img { width: 100%; height: auto; border-radius: 8px; object-fit: contain; cursor: zoom-in; }
+        
+        .btn-download { background: var(--input-bg); color: var(--text-main); padding: 8px; border-radius: 6px; font-size: 13px; cursor: pointer; text-align: center; font-weight: 500; text-decoration: none; display: flex; align-items: center; justify-content: center; gap: 4px; transition: background 0.2s;}
+        .btn-download:hover { background: #e5e7eb; }
+        .btn-delete-record { color: #dc2626; cursor: pointer; font-size: 12px; margin-left: 12px; text-decoration: underline; }
+        
+        .skeleton { background: var(--input-bg); border-radius: 8px; min-height: 220px; display: flex; align-items: center; justify-content: center; color: var(--text-muted); font-size: 13px; animation: pulse 1.5s infinite; text-align: center; padding: 20px;}
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.6; } }
+
+        /* 图片大图预览遮罩层样式 */
+        .image-viewer-mask {
+            position: fixed;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            background: rgba(0,0,0,0.85);
+            display: none; 
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            cursor: zoom-out;
+            backdrop-filter: blur(4px);
+        }
+        .image-viewer-mask img {
+            max-width: 90%;
+            max-height: 90%;
+            border-radius: 8px;
+            box-shadow: 0 0 30px rgba(0,0,0,0.5);
+            cursor: default;
+            user-select: none;
+        }
+
+        /* ================= 底部高仿输入框 ================= */
+        .input-container { padding: 0 10% 24px; position: relative; z-index: 20; }
+        .input-box { background: #ffffff; border-radius: 24px; border: 1px solid #dadce0; box-shadow: 0 4px 16px rgba(0,0,0,0.06); padding: 16px; display: flex; flex-direction: column; transition: box-shadow 0.2s, border-color 0.2s; }
+        .input-box:focus-within { box-shadow: 0 4px 20px rgba(0,0,0,0.1); border-color: #c4c7c5; }
+
+        .preview-area { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 8px; padding-left: 4px; }
+        .thumb-wrap { position: relative; display: inline-block; }
+        .thumb-wrap img { width: 48px; height: 48px; object-fit: cover; border-radius: 8px; border: 1px solid var(--border-color); cursor: zoom-in; }
+        .del-thumb { position: absolute; top: -6px; right: -6px; background: #6b7280; color: #fff; width: 18px; height: 18px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 12px; cursor: pointer; border: 1px solid #fff; z-index: 10; }
+        .del-thumb:hover { background: #ef4444; }
+
+        .textarea-wrapper { position: relative; width: 100%; }
+
+        textarea#prompt { 
+            width: 100%; border: none; background: transparent; font-size: 15px; 
+            color: var(--text-main); resize: none; min-height: 24px; max-height: 150px; 
+            outline: none; line-height: 1.5; 
+            padding: 0 44px 0 4px; 
+            margin-bottom: 8px; 
+        }
+        textarea#prompt::placeholder { color: #9aa0a6; }
+
+        .input-controls { display: flex; justify-content: space-between; align-items: flex-end; padding-top: 4px; }
+        .controls-left { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; padding-bottom: 4px;}
+        
+        .btn-add-file { display: flex; align-items: center; justify-content: center; width: 32px; height: 32px; border-radius: 50%; cursor: pointer; color: #5f6368; font-size: 24px; transition: background 0.2s; margin-left: -4px;}
+        .btn-add-file:hover { background: #f0f4f9; color: var(--text-main); }
+        .divider { width: 1px; height: 16px; background: #dadce0; }
+
+        .param-pill { display: inline-flex; align-items: center; background: #ffffff; border: 1px solid #dadce0; border-radius: 24px; cursor: pointer; transition: all 0.2s ease; height: 28px; white-space: nowrap; width: 90px; }
+        .param-pill:hover { background: #f8f9fa; border-color: #c4c7c5; }
+        .param-pill:focus-within { border-color: var(--primary-blue); box-shadow: 0 0 0 2px rgba(26,115,232,0.1); }
+        .pill-label { font-size: 12px; color: var(--text-muted); margin-left: 10px; font-weight: 500; pointer-events: none; user-select: none; }
+        .param-select { appearance: none; background: transparent; border: none; font-size: 12px; font-weight: 600; color: var(--text-main); outline: none; cursor: pointer; height: 100%; padding: 0 24px 0 6px; background-image: url("data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2224%22%20height%3D%2224%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%235f6368%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%stroke-linejoin%3D%22round%22%3E%3Cpolyline%20points%3D%226%209%2012%2015%2018%209%22%3E%3C%2Fpolyline%3E%3C%2Fsvg%3E"); background-repeat: no-repeat; background-position: right 6px center; background-size: 12px; flex: 1; min-width: 0; text-overflow: ellipsis; }
+
+        .btn-send { 
+            position: absolute; right: 0; top: -4px; 
+            width: 36px; height: 36px; border-radius: 50%; background: var(--primary-blue); 
+            color: #fff; border: none; display: flex; align-items: center; justify-content: center; 
+            cursor: pointer; transition: background 0.2s; flex-shrink: 0; z-index: 21;
+        }
+        .btn-send:hover { background: var(--primary-hover); }
+        .btn-send svg { width: 18px; height: 18px; fill: white; }
+
+        .raw-data-btn { display: inline-block; font-size: 12px; color: var(--text-muted); cursor: pointer; text-decoration: underline; margin-top: 12px; }
+
+        .scroll-to-bottom-btn {
+            position: absolute;
+            top: -44px; 
+            left: 50%;
+            transform: translateX(-50%) translateY(10px);
+            width: 36px;
+            height: 36px;
+            background: #ffffff;
+            border-radius: 50%;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            opacity: 0;
+            visibility: hidden;
+            transition: all 0.2s ease;
+            z-index: 30;
+            color: var(--text-muted);
+        }
+        .scroll-to-bottom-btn.show {
+            opacity: 1;
+            visibility: visible;
+            transform: translateX(-50%) translateY(0);
+        }
+        .scroll-to-bottom-btn:hover {
+            color: var(--text-main);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        }
+        .scroll-to-bottom-btn svg {
+            width: 20px;
+            height: 20px;
+            fill: currentColor;
+        }
+
+        @media (max-width: 600px) {
+            .sidebar { width: 100% !important; border-right: none; z-index: 100;}
+            .sidebar:not(.collapsed) ~ .main-content { display: none; }
+            .sidebar:not(.collapsed) ~ .resizer { display: none; }
+            .sidebar.collapsed { width: 0 !important; }
+            .header, .config-area { min-width: auto; }
+
+            .input-container { padding: 0 16px 16px; } 
+            .chat-history { padding: 20px 16px 40px; } 
+            .input-controls { align-items: center; gap: 8px; }
+            .controls-left { gap: 8px; flex-wrap: nowrap; overflow-x: auto; -webkit-overflow-scrolling: touch; scrollbar-width: none; flex: 1; min-width: 0; padding-bottom: 0; }
+            .controls-left::-webkit-scrollbar { display: none; }
+            .param-pill, .btn-add-file, .divider { flex-shrink: 0; }
+            .param-pill { height: 26px; }
+            .pill-label { font-size: 11px; margin-left: 8px; }
+            .param-select { font-size: 11px; padding: 0 20px 0 4px; }
+            .main-content { min-width: 0 !important; width: 100% !important; max-width: 100%; }
+        }
+
+        /* ================= 图片涂鸦面板样式 ================= */
+        .doodle-mask {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.85); display: none; align-items: center; justify-content: center;
+            z-index: 2000; flex-direction: column; backdrop-filter: blur(4px);
+        }
+        .doodle-toolbar {
+            background: var(--bg-panel); padding: 8px 16px; border-radius: 12px;
+            margin-bottom: 16px; display: flex; gap: 16px; align-items: center;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.2); flex-wrap: wrap;
+        }
+        .doodle-toolbar button {
+            padding: 4px 10px; border: none; border-radius: 6px; cursor: pointer;
+            font-size: 10px; font-weight: 500; background: var(--input-bg); color: var(--text-main);
+            transition: all 0.2s;
+        }
+        .doodle-toolbar button:hover { background: #e5e7eb; }
+        .doodle-toolbar button.active { background: var(--primary-blue); color: white; }
+        .doodle-toolbar .save-btn { background: #10b981; color: white; }
+        .doodle-toolbar .save-btn:hover { background: #059669; }
+        
+        .doodle-canvas-container {
+            position: relative; max-width: 95vw; max-height: 80vh;
+            background: transparent; border-radius: 8px; overflow: auto;
+            box-shadow: 0 0 30px rgba(0,0,0,0.5);
+        }
+        canvas#doodleCanvas { 
+            cursor: crosshair; 
+            touch-action: none; 
+            display: block; 
+            user-select: none; 
+            -webkit-user-select: none; 
+            -webkit-touch-callout: none;
+        }
+        .edit-thumb {
+            position: absolute; bottom: -6px; right: -6px; background: #1a73e8; color: #fff;
+            width: 18px; height: 18px; border-radius: 50%; display: flex; align-items: center;
+            justify-content: center; font-size: 11px; cursor: pointer; border: 1px solid #fff;
+            z-index: 10;
+        }
+        .edit-thumb:hover { background: #1557b0; }
+
+/* ================= 画廊与拖拽控件样式 ================= */
+        .viewer-btn {
+            position: absolute; top: 50%; transform: translateY(-50%);
+            font-size: 40px; color: rgba(255,255,255,0.6); cursor: pointer; user-select: none;
+            padding: 20px; z-index: 1001; transition: all 0.2s; border-radius: 8px;
+        }
+        .viewer-btn:hover { color: white; background: rgba(0,0,0,0.3); }
+        .viewer-prev { left: 20px; }
+        .viewer-next { right: 20px; }
+        .viewer-close {
+            position: absolute; top: 20px; right: 30px; font-size: 40px; color: rgba(255,255,255,0.6);
+            cursor: pointer; z-index: 1001; line-height: 1; user-select: none;
+        }
+        .viewer-close:hover { color: white; }
+        #fullImage { transition: transform 0.1s ease-out; cursor: grab; transform-origin: center center; }
+        #fullImage:active { cursor: grabbing; }
+
+        /* 优化涂鸦容器的滚动条，让放大后拖拽更舒服 */
+        .doodle-canvas-container::-webkit-scrollbar { width: 12px; height: 12px; }
+        .doodle-canvas-container::-webkit-scrollbar-corner { background: transparent; }
+        .doodle-canvas-container::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.2); border-radius: 6px; border: 3px solid transparent; background-clip: content-box;}
+        .doodle-canvas-container::-webkit-scrollbar-thumb:hover { background-color: rgba(0,0,0,0.4); }
+
+/* ================= 新增：提示词管理弹窗样式 ================= */
+        .prompt-modal-mask {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.5); display: none; align-items: center; justify-content: center;
+            z-index: 3000; backdrop-filter: blur(2px);
+        }
+        .prompt-modal {
+            background: var(--bg-panel); width: 90%; max-width: 400px; border-radius: 12px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2); overflow: hidden; display: flex; flex-direction: column;
+        }
+        .prompt-modal-header {
+            padding: 16px 20px; border-bottom: 1px solid var(--border-color); display: flex;
+            justify-content: space-between; align-items: center; font-weight: 600;
+        }
+        .prompt-modal-close { cursor: pointer; color: var(--text-muted); font-size: 20px; line-height: 1; }
+        .prompt-modal-close:hover { color: var(--text-main); }
+        .prompt-list { max-height: 300px; overflow-y: auto; padding: 10px 0; }
+        .prompt-item {
+            padding: 10px 20px; display: flex; justify-content: space-between; align-items: center;
+            border-bottom: 1px solid #f3f4f6; transition: background 0.2s;
+        }
+        .prompt-item:hover { background: #f9fafb; }
+        .prompt-item-title { font-size: 14px; color: var(--text-main); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; margin-right: 12px;}
+        .prompt-delete-btn {
+            color: #ef4444; cursor: pointer; padding: 4px 10px; border-radius: 6px; font-size: 12px;
+            background: #fef2f2; transition: all 0.2s; font-weight: 500;
+        }
+        .prompt-delete-btn:hover { background: #fee2e2; }
+        .prompt-empty { padding: 20px; text-align: center; color: var(--text-muted); font-size: 13px; }
+
+    </style>
+</head>
+<body>
+
+<aside class="sidebar collapsed" id="sidebar">
+        <div class="header">
+            <h2>AI IMG HUB</h2>
+            <div class="sidebar-toggle-btn" id="sidebar-inside-btn" onclick="toggleSidebar()" title="收起侧边栏">
+                <svg viewBox="0 0 24 24" width="24" height="24" fill="currentColor"><path d="M3 18h18v-2H3v2zm0-5h18v-2H3v2zm0-7v2h18V6H3z"/></svg>
+            </div>
+        </div>
+        <div class="config-area">
+            <div class="section-title">
+                接口配置
+                <span class="save-btn" onclick="saveConfig()">保存配置</span>
+            </div>
+            
+            <div class="form-group">
+                <label>接口网站 (API Engine)</label>
+                <select id="apiVersion" onchange="handleVersionSwitch()">
+                    <option value="old">nodap 0.133元/张 1K/2K 同价</option>
+                    <option value="new">ai6800 0.094元/张 1K/2K/4K 同价</option>
+                    <option value="alapi">alapi 0.05元/张 1K*数量</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label>基础域名 (Base URL)</label>
+                <input type="text" id="baseUrl">
+            </div>
+            <div class="form-group">
+                <label>服务路由 (API POST)</label>
+                <input type="text" id="apiPath">
+            </div>
+            <div class="form-group">
+                <label>执行模型</label>
+                <input type="text" id="modelName">
+            </div>
+            <div class="form-group">
+                <label>API令牌 (Key)</label>
+                <input type="password" id="apiKey" placeholder="sk-...">
+            </div>
+            
+            <div class="form-group" id="imgbbGroup" style="display:none;">
+                <label>图床 API 令牌 (ImgBB)</label>
+                <input type="password" id="imgbbApiKey" placeholder="留空则提示配置...">
+            </div>
+
+            <div class="section-title" style="margin-top: 24px;">
+                云端同步 (JSONBin)
+                <label class="save-btn" for="importConfigBtn" style="margin: 0; cursor: pointer;">一键导入配置</label>
+                <input type="file" id="importConfigBtn" accept=".json" style="display:none;" onchange="importConfig(event)">
+            </div>
+            <div class="form-group">
+                <label>Master Key (云端密钥)</label>
+                <input type="password" id="cloudApiKey">
+            </div>
+            <div class="form-group">
+                <label>Bin ID (云端仓库ID)</label>
+                <input type="text" id="cloudBinId">
+            </div>
+            <div style="display: flex; gap: 10px; margin-bottom: 20px;">
+                <div class="btn-sync up" onclick="syncAllToCloud(this)">同步到云端</div>
+                <div class="btn-sync down" onclick="loadFromCloudAndRender(this)">从云端恢复</div>
+            </div>
+
+            <div class="price-box" style="border: 1px solid #ccc; padding: 12px 16px; border-radius: 8px; background-color: #f9f9f9; width: fit-content; min-width: 100%;">
+                <h3 style="margin-bottom: 8px;">API价格</h3>
+                <div style="font-size: 0.85em; color: gray; margin: 8px 0;">www.nodapi.com   每张0.133元</div>
+                <div style="font-size: 0.85em; color: gray; margin: 8px 0;">jc.ai6800.com  每张0.094元 (1K/2K/4K同价)</div>
+                <div style="font-size: 0.85em; color: gray; margin: 8px 0;">www.alapi.cn 每张0.05元 (2K按2张，4K按3张)</div>
+            </div>
+
+<p style="margin-top: 20px;">云端数据：https://jsonbin.io</p><p>图床网站：https://api.imgbb.com</p><p>令牌网站：https://www.nodapi.com</p><p>令牌网站：https://jc.ai6800.com</p><p>令牌网站：https://www.alapi.cn</p>
+
+        </div>
+    </aside>
+
+<div class="resizer collapsed" id="resizer"></div>
+
+    <main class="main-content">
+        <div class="chat-top-bar">
+            <div class="sidebar-toggle-btn" onclick="toggleSidebar()" title="展开/收起侧边栏">
+                <svg viewBox="0 0 24 24" width="24" height="24" fill="currentColor"><path d="M3 18h18v-2H3v2zm0-5h18v-2H3v2zm0-7v2h18V6H3z"/></svg>
+            </div>
+            <div class="current-api-display" id="currentApiDisplay">
+
+    <select id="topApiVersion" onchange="document.getElementById('apiVersion').value = this.value; handleVersionSwitch();" style="background: transparent; border: none; font-size: 13px; font-weight: 600; color: var(--primary-blue); outline: none; cursor: pointer;">
+        <option value="old">nodapi.com (0.133元)</option>
+        <option value="new">jc.ai6800.com (0.094元)</option>
+        <option value="alapi">alapi.cn (0.05元起)</option>
+    </select>
+</div>
+            <div class="clear-history-btn" onclick="clearAllHistory()">清空记录</div>
+        </div>
+
+        <div class="chat-history" id="chatHistory">
+            <div class="message-row ai-msg" id="welcomeMessage">
+                <div class="avatar">AI</div>
+                <div class="bubble">
+                    <div class="bubble-text" style="color: var(--text-main);">
+                        你好！我是你的专属图像生成助手。请在左侧配置好 API，然后在下方输入提示词或上传参考图开始创作。
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="input-container">
+            <div class="scroll-to-bottom-btn" id="scrollToBottomBtn" onclick="scrollToBottom()" title="返回底部">
+                <svg viewBox="0 0 24 24"><path d="M20 12l-1.41-1.41L13 16.17V4h-2v12.17l-5.58-5.59L4 12l8 8 8-8z"/></svg>
+            </div>
+
+            <div class="input-box">
+                <div class="preview-area" id="previewArea"></div>
+
+                <div class="textarea-wrapper">
+                    <textarea id="prompt" placeholder="发消息..." rows="1" oninput="autoResize(this)" onkeydown="handleEnter(event)"></textarea>
+                    <button class="btn-send" id="generateBtn" onclick="executeGeneration()">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M4 12l1.41 1.41L11 7.83V20h2V7.83l5.58 5.59L20 12l-8-8-8 8z"/></svg>
+                    </button>
+                </div>
+
+                <div class="input-controls">
+                    <div class="controls-left">
+                        <label for="refImages" class="btn-add-file" id="uploadLabel" title="上传参考图">+</label>
+                        <input type="file" id="refImages" accept="image/*" multiple style="display:none;">
+                        
+                        <div class="divider"></div>
+
+                        <div class="param-pill" onclick="triggerPicker(this)">
+                            <span class="pill-label">比例</span>
+                            <select id="size" class="param-select" onclick="event.stopPropagation()">
+                                <option value="auto">智能</option>
+                                <option value="1024x1024">1:1(1K)</option>
+                                <option value="1024x1536">2:3(1K)</option>
+                                <option value="1536x1024">3:2(1K)</option>
+                                <option value="1672x941">16:9(1K)</option>
+                                <option value="941x1672">9:16(1K)</option>
+                                <option value="2048x2048">1:1 (2K)</option>
+                                <option value="2048x1152">16:9 (2K)</option>
+                                <option value="1152x2048">9:16 (2K)</option>
+                                <option value="3840x2160">16:9 (4K)</option>
+                                <option value="2160x3840">9:16 (4K)</option>
+                            </select>
+                        </div>
+
+                        <div class="param-pill" onclick="triggerPicker(this)">
+                            <span class="pill-label">数量</span>
+                            <select id="n" class="param-select" onclick="event.stopPropagation()">
+                                <option value="1">1 张</option>
+                                <option value="2">2 张</option>
+                                <option value="3">3 张</option>
+                                <option value="4">4 张</option>
+                            </select>
+                        </div>
+                        
+                        <div class="param-pill" onclick="triggerPicker(this)">
+                            <select id="promptLibrary" class="param-select" style="padding-left: 14px;" onclick="event.stopPropagation()" onchange="handlePromptSelect(this)">
+                                <option value="" disabled selected hidden>提示词</option>
+                            </select>
+                        </div>
+
+                        <input type="file" id="importPromptsBtn" accept=".txt,.json" style="display:none;" onchange="importPrompts(event)">
+                        <div class="param-pill" id="pillResolution" onclick="triggerPicker(this)">
+                            <span class="pill-label">质量</span>
+                            <select id="resolution" class="param-select" onclick="event.stopPropagation()">
+                                 <option value="auto">智能</option>
+                                <option value="medium">标清</option>
+                                <option value="high" selected>高清</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+
+<div id="imageViewer" class="image-viewer-mask">
+        <div class="viewer-btn viewer-prev" onclick="navigateViewer(-1, event)">&#10094;</div>
+        <img id="fullImage" src="" alt="Full Preview">
+        <div class="viewer-btn viewer-next" onclick="navigateViewer(1, event)">&#10095;</div>
+        <div class="viewer-close" onclick="closeViewer(event)">×</div>
+    </div>
+
+    <div id="doodleEditor" class="doodle-mask">
+    <div class="doodle-toolbar">
+            <button id="toolBrush" class="active" onclick="setDoodleTool('brush')">🖍️ 画笔</button>
+            <button id="toolText" onclick="setDoodleTool('text')">🔤 文字</button>
+            <div style="display: flex; align-items: center; gap: 8px; border-left: 1px solid #ccc; padding-left: 16px;">
+                <label style="font-size: 12px; color: var(--text-muted);">颜色</label>
+                <input type="color" id="doodleColor" value="#ff0000" style="width: 30px; height: 30px; padding: 0; border: none; cursor: pointer;">
+            </div>
+            
+            <div style="display: flex; align-items: center; gap: 8px;">
+                <label style="font-size: 12px; color: var(--text-muted);">粗细</label>
+                <input type="range" id="doodleSize" min="1" max="30" value="5" style="width: 80px;">
+            </div>
+
+            <div style="border-left: 1px solid #ccc; padding-left: 16px; display: flex; gap: 4px; align-items: center;" title="快捷键: 鼠标滚轮缩放，按住空格或中键拖拽">
+                <button onclick="changeDoodleZoom(0.2)">🔍 放大</button>
+                <span id="doodleZoomTxt" style="font-size:12px; color:var(--text-muted); width:36px; text-align:center;">100%</span>
+                <button onclick="changeDoodleZoom(-0.2)">缩小</button>
+            </div>
+            
+            <div style="border-left: 1px solid #ccc; padding-left: 16px; display: flex; gap: 8px;">
+                <button onclick="undoDoodle()" title="撤销上一步操作">↩️ 撤销</button>
+                <button onclick="clearDoodle(); saveState();" title="重新开始">🗑️ 清空</button>
+                <button onclick="closeDoodleEditor()">取消</button>
+                <button class="save-btn" onclick="saveDoodle()">✅ 保存</button>
+            </div>
+        </div>
+
+        <div class="doodle-canvas-container">
+            <canvas id="doodleCanvas"></canvas>
+        </div>
+    </div>
+
+    <div id="promptManagerModal" class="prompt-modal-mask">
+        <div class="prompt-modal">
+            <div class="prompt-modal-header">
+                <span>管理提示词</span>
+                <div class="prompt-modal-close" onclick="closePromptManager()">×</div>
+            </div>
+            <div id="promptManagerList" class="prompt-list"></div>
+        </div>
+    </div>
+
+    <script>
+        // ================= 防刷新与本地缓存逻辑 =================
+        let activeTaskCount = 0;
+        window.addEventListener('beforeunload', (e) => {
+            if (activeTaskCount > 0) {
+                e.preventDefault();
+                e.returnValue = '有生图正在进行，离开页面将导致生图丢失！';
+            }
+        });
+        window.failedTasks = {};
+
+        const DB_NAME = 'AI_IMG_HUB_DB';
+        const STORE_NAME = 'history';
+        let dbInstance = null;
+
+        function initDB() {
+            return new Promise((resolve, reject) => {
+                if (dbInstance) return resolve(dbInstance);
+                const req = indexedDB.open(DB_NAME, 1);
+                req.onupgradeneeded = (e) => {
+                    const db = e.target.result;
+                    if (!db.objectStoreNames.contains(STORE_NAME)) {
+                        db.createObjectStore(STORE_NAME, { keyPath: 'id', autoIncrement: true });
+                    }
+                };
+                req.onsuccess = (e) => { dbInstance = e.target.result; resolve(dbInstance); };
+                req.onerror = (e) => reject(e.target.error);
+            });
+        }
+
+        async function getHistoryFromDB() {
+            const db = await initDB();
+            return new Promise((resolve) => {
+                const tx = db.transaction(STORE_NAME, 'readonly');
+                const req = tx.objectStore(STORE_NAME).getAll();
+                req.onsuccess = () => {
+                    let res = req.result || [];
+                    res.sort((a,b) => b.id - a.id); 
+                    resolve(res);
+                };
+            });
+        }
+
+        async function saveToDB(item) {
+            const db = await initDB();
+            return new Promise((resolve) => {
+                const tx = db.transaction(STORE_NAME, 'readwrite');
+                tx.objectStore(STORE_NAME).add(item);
+                tx.oncomplete = () => resolve();
+            });
+        }
+
+
+// BUG FIX #2 & #12：使用原子事务重写，并强制剥离冲突 ID，防止多端主键碰撞
+        async function replaceDB(items) {
+            const db = await initDB();
+            return new Promise((resolve, reject) => {
+                const tx = db.transaction(STORE_NAME, 'readwrite');
+                const store = tx.objectStore(STORE_NAME);
+                
+                // 1. 清空本地旧数据
+                store.clear();
+                
+                // 2. 遍历写入新数据
+                items.forEach(item => {
+                    // 核心修复点：将 id 属性剥离（解构赋值），只保留真实的业务数据
+                    // 这样存入时，IndexedDB 就会自动分配全新的自增 ID，永不冲突
+                    const { id, ...itemWithoutId } = item;
+                    store.add(itemWithoutId);
+                });
+                
+                tx.oncomplete = () => resolve();
+                tx.onerror = (e) => reject(e.target.error);
+            });
+        }
+
+
+        async function deleteFromDBByUrl(url) {
+            const db = await initDB();
+            return new Promise((resolve) => {
+                const tx = db.transaction(STORE_NAME, 'readwrite');
+                const store = tx.objectStore(STORE_NAME);
+                const req = store.getAll();
+                req.onsuccess = () => {
+                    const items = req.result;
+                    const itemToDelete = items.find(i => i.url === url);
+                    if (itemToDelete) store.delete(itemToDelete.id).onsuccess = resolve;
+                    else resolve();
+                }
+            });
+        }
+
+        async function clearDB() {
+            const db = await initDB();
+            return new Promise((resolve) => {
+                const tx = db.transaction(STORE_NAME, 'readwrite');
+                tx.objectStore(STORE_NAME).clear().onsuccess = resolve;
+            });
+        }
+
+        async function migrateHistory() {
+            const HISTORY_KEY = 'hub_img_history';
+            let oldHistory = JSON.parse(localStorage.getItem(HISTORY_KEY) || '[]');
+            if (oldHistory.length > 0) {
+                for (let i = oldHistory.length - 1; i >= 0; i--) {
+                    await saveToDB(oldHistory[i]);
+                }
+                localStorage.removeItem(HISTORY_KEY);
+            }
+        }
+
+        const API_PRESETS = {
+            'old': { url: 'https://www.nodapi.com', path: '/v1/images/generations', model: 'gpt-image-2-all' },
+            'new': { url: 'https://api.ai6800.com', path: '/v1/media/generate', model: 'gpt-image-2' },
+            'alapi': { url: 'https://v3.alapi.cn', path: '/api/ai/images/generations_sync', model: 'gpt-image-2' }
+        };
+
+        let refImagesBase64 = []; 
+        let rawDataStore = {};
+        let isSyncing = false; // BUG FIX #7：同步状态锁
+
+        window.onload = async () => {
+            const savedVersion = localStorage.getItem('hub_apiVersion') || 'old';
+            document.getElementById('apiVersion').value = savedVersion;
+            
+            handleVersionSwitch(true); 
+            await initDB();
+            await migrateHistory();
+            await loadHistoryIntoChat(); 
+            
+            renderPromptLibrary(); // ⬅️ 新增：初始化提示词列表
+
+            document.getElementById('cloudApiKey').value = localStorage.getItem('hub_cloudApiKey') || '';
+            document.getElementById('cloudBinId').value = localStorage.getItem('hub_cloudBinId') || '';
+            document.getElementById('imgbbApiKey').value = localStorage.getItem('hub_imgbbApiKey') || '';
+
+
+        };
+
+async function silentRestoreFromCloud() {
+            const config = getCloudConfig();
+            if (!config.apiKey || !config.binId) return;
+
+            try {
+                // ⬅️ 修改点：加入时间戳防缓存
+                const response = await fetch(`https://api.jsonbin.io/v3/b/${config.binId}/latest?t=${Date.now()}`, {
+                    headers: { 'X-Master-Key': config.apiKey },
+                    cache: 'no-store'
+                });
+
+                if (!response.ok) return;
+                const data = await response.json();
+                const cloudHistory = data.record.history || []; 
+                // ⬇️ 新增：提取并合并云端提示词
+                const cloudPrompts = data.record.prompts || []; 
+                
+                if (Array.isArray(cloudPrompts) && cloudPrompts.length > 0) {
+                    let localPrompts = JSON.parse(localStorage.getItem('hub_saved_prompts') || '[]');
+                    const mapP = new Map();
+                    localPrompts.forEach(p => mapP.set(p.content, p)); // 以 content 为 key 去重
+                    cloudPrompts.forEach(p => mapP.set(p.content, p));
+                    localStorage.setItem('hub_saved_prompts', JSON.stringify(Array.from(mapP.values())));
+                    renderPromptLibrary(); // 更新UI
+                }
+                // ⬆️ 新增结束
+
+                if (Array.isArray(cloudHistory)) {
+                    const localHistory = await getHistoryFromDB();
+
+                    const map = new Map();
+                    localHistory.forEach(item => map.set(item.url, item));
+                    cloudHistory.forEach(item => map.set(item.url, item)); 
+
+                    const mergedHistory = Array.from(map.values()).sort((a, b) => {
+                        const tA = new Date(a.time.replace(/-/g, '/')).getTime() || 0;
+                        const tB = new Date(b.time.replace(/-/g, '/')).getTime() || 0;
+                        return tA - tB;
+                    });
+
+                    const localUrls = localHistory.map(item => item.url).sort().join(',');
+                    const mergedUrls = mergedHistory.map(item => item.url).sort().join(',');
+
+                    if (localUrls !== mergedUrls) {
+                        // BUG FIX #2 & #8：安全替换并只在真正更新时才重渲染
+                        await replaceDB(mergedHistory); 
+                        document.getElementById('chatHistory').innerHTML = document.getElementById('welcomeMessage').outerHTML;
+                        await loadHistoryIntoChat();
+                        console.log('启动时：静默合并云端新数据成功，已更新视图。');
+                    }
+                }
+            } catch (error) {
+                console.error('启动时静默拉取云端记录失败:', error);
+            }
+        }
+
+        
+
+        function importConfig(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const config = JSON.parse(e.target.result);
+                    let importedCount = 0;
+                    for (let key in config) {
+                        if (key.startsWith('hub_')) {
+                            localStorage.setItem(key, config[key]);
+                            importedCount++;
+                        }
+                    }
+                    alert(`成功导入 ${importedCount} 项配置！页面即将刷新以应用。`);
+                    location.reload();
+                } catch (err) {
+                    alert('导入失败，请检查是否为格式正确的 .json 文件。');
+                }
+            };
+            reader.readAsText(file);
+            event.target.value = ''; 
+        }
+
+        function getCloudConfig() {
+            return {
+                apiKey: document.getElementById('cloudApiKey').value.trim(),
+                binId: document.getElementById('cloudBinId').value.trim()
+            };
+        }
+
+     
+let pendingSyncQueue = []; // 修改点：新增单条数据待同步队列
+
+        // 修改点：重构触发器，支持接收数据、取消延时并增加防限流的自旋锁
+        function triggerSilentSync(newItem) {
+            if (newItem) pendingSyncQueue.push(newItem); // 新图入队
+
+            // 如果正在同步，不丢弃请求，而是延迟 500ms 不断检查状态
+            if (isSyncing) {
+                setTimeout(() => triggerSilentSync(), 500); 
+                return;
+            }
+            
+            if (pendingSyncQueue.length === 0) return;
+            silentSyncToCloud();
+        }
+
+        // 修改点：重构静默同步逻辑，实现基于队列的安全增量推送
+        async function silentSyncToCloud() {
+            const config = getCloudConfig();
+            if (!config.apiKey || !config.binId || pendingSyncQueue.length === 0) return; 
+            
+            isSyncing = true; // 加锁
+            try {
+                // 快照当前队列并清空，准备接收下一批并发生图
+                const itemsToSync = [...pendingSyncQueue];
+                pendingSyncQueue = [];
+
+                // 强制无缓存拉取当前云端最新状态
+                const getRes = await fetch(`https://api.jsonbin.io/v3/b/${config.binId}/latest?t=${Date.now()}`, {
+                    headers: { 'X-Master-Key': config.apiKey },
+                    cache: 'no-store'
+                });
+                
+                // 核心安全校验：若拉取云端失败必须熔断，防止用这几条新图清空整个云端历史
+                if (!getRes.ok) throw new Error('拉取云端记录失败，为防覆盖已中止静默上传');
+
+               const data = await getRes.json();
+                let cloudHistory = (data.record && Array.isArray(data.record.history)) ? data.record.history : [];
+                // ⬇️ 新增：保护云端现有的 prompts 不被静默同步抹除
+                let cloudPrompts = (data.record && Array.isArray(data.record.prompts)) ? data.record.prompts : [];
+                // ⬆️ 新增结束
+
+                // 仅合并云端已有数据 + 队列里的新数据
+                // ... (省略中间保持不变的代码)
+
+                // 极速覆盖回云端
+                await fetch(`https://api.jsonbin.io/v3/b/${config.binId}`, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-Master-Key': config.apiKey,
+                        'X-Bin-Versioning': 'false' 
+                    },
+                    // ⬇️ 修改：回写历史时携带上保护好的 prompts
+                    body: JSON.stringify({ history: mergedHistory, prompts: cloudPrompts }) 
+                    // ⬆️ 修改结束
+                });
+
+
+            } catch (error) {
+                console.error('后台云端静默单条同步失败:', error);
+                // 失败时，可选择性将数据重新塞回队列头部等待下次同步
+                // pendingSyncQueue.unshift(...itemsToSync); 
+            } finally {
+                isSyncing = false; // 释放锁
+            }
+        }
+
+
+
+// 修改后：
+window.autoRemoveBrokenLink = async function(url, imgElement) {
+    console.log('图片链接已失效，自动清理:', url);
+    const block = imgElement.closest('.history-block');
+    if (block) {
+        block.style.opacity = '0';
+        block.style.transition = 'opacity 0.3s';
+        setTimeout(() => block.remove(), 300);
+    }
+    await deleteFromDBByUrl(url);
+    syncDeletionToCloud(url); // ⬅️ 改用精准删除同步
+};
+
+
+        async function syncAllToCloud(btn) {
+            const config = getCloudConfig();
+            if (!config.apiKey || !config.binId) return alert("请先在左侧填写云端同步密钥和 Bin ID");
+            if (isSyncing) return; // BUG FIX #7
+
+            isSyncing = true;
+            const originalText = btn.innerText;
+            btn.innerText = "合并上传中...";
+            btn.style.opacity = '0.7';
+
+            try {
+                const localHistory = await getHistoryFromDB(); 
+
+                let cloudHistory = [];
+                try {
+                    const getRes = await fetch(`https://api.jsonbin.io/v3/b/${config.binId}/latest`, {
+                        headers: { 'X-Master-Key': config.apiKey }
+                    });
+                    if (getRes.ok) {
+                        const data = await getRes.json();
+                        if (data.record && Array.isArray(data.record.history)) {
+                            cloudHistory = data.record.history;
+                        }
+                    }
+                } catch(e) {}
+
+                const map = new Map();
+                cloudHistory.forEach(item => map.set(item.url, item));
+                localHistory.forEach(item => map.set(item.url, item));
+
+                const mergedHistory = Array.from(map.values()).sort((a, b) => {
+                    const tA = new Date(a.time.replace(/-/g, '/')).getTime() || 0;
+                    const tB = new Date(b.time.replace(/-/g, '/')).getTime() || 0;
+                    return tA - tB;
+                });
+
+                const putRes = await fetch(`https://api.jsonbin.io/v3/b/${config.binId}`, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-Master-Key': config.apiKey
+                    },
+                    // ⬇️ 修改：上传历史记录的同时，附带本地提示词库
+                    body: JSON.stringify({ 
+                        history: mergedHistory,
+                        prompts: JSON.parse(localStorage.getItem('hub_saved_prompts') || '[]')
+                    }) 
+                    // ⬆️ 修改结束
+                });
+
+                if (!putRes.ok) throw new Error("同步请求失败");
+
+                await replaceDB(mergedHistory); // BUG FIX #2
+                
+                document.getElementById('chatHistory').innerHTML = document.getElementById('welcomeMessage').outerHTML;
+                await loadHistoryIntoChat();
+
+                alert('🚀 同步成功！多端数据已完美合并并上传。');
+            } catch (error) {
+                console.error('云端同步失败:', error);
+                alert('云端同步失败: ' + error.message);
+            } finally {
+                btn.innerText = originalText;
+                btn.style.opacity = '1';
+                isSyncing = false;
+            }
+        }
+
+
+async function loadFromCloudAndRender(btn) {
+            const config = getCloudConfig();
+            if (!config.apiKey || !config.binId) return alert("请先在左侧填写云端同步密钥和 Bin ID");
+            if (isSyncing) return; 
+            if (!confirm('此操作将拉取云端数据，并与本地现有的聊天记录进行智能合并，是否继续？')) return;
+
+            isSyncing = true;
+            const originalText = btn.innerText;
+            btn.innerText = "合并拉取中...";
+            btn.style.opacity = '0.7';
+
+            try {
+                const response = await fetch(`https://api.jsonbin.io/v3/b/${config.binId}/latest?t=${Date.now()}`, {
+                    headers: { 'X-Master-Key': config.apiKey },
+                    cache: 'no-store'
+                });
+
+                // 诊断强化：明确捕获 HTTP 状态码
+                if (!response.ok) {
+                    throw new Error(`HTTP 状态码: ${response.status} (401=密钥错, 404=ID错/仓库不存在, 429=请求过快)`);
+                }
+
+                const data = await response.json();
+                const cloudHistory = data.record.history || []; 
+                // ⬇️ 新增：提取并合并云端提示词
+                const cloudPrompts = data.record.prompts || []; 
+                
+                if (Array.isArray(cloudPrompts) && cloudPrompts.length > 0) {
+                    let localPrompts = JSON.parse(localStorage.getItem('hub_saved_prompts') || '[]');
+                    const mapP = new Map();
+                    localPrompts.forEach(p => mapP.set(p.content, p)); // 以 content 为 key 去重
+                    cloudPrompts.forEach(p => mapP.set(p.content, p));
+                    localStorage.setItem('hub_saved_prompts', JSON.stringify(Array.from(mapP.values())));
+                    renderPromptLibrary(); // 更新UI
+                }
+                // ⬆️ 新增结束
+
+                if (Array.isArray(cloudHistory)) {
+                    const localHistory = await getHistoryFromDB();
+
+                    const map = new Map();
+                    localHistory.forEach(item => map.set(item.url, item));
+                    cloudHistory.forEach(item => map.set(item.url, item)); 
+
+                    const mergedHistory = Array.from(map.values()).sort((a, b) => {
+                        const tA = new Date(a.time.replace(/-/g, '/')).getTime() || 0;
+                        const tB = new Date(b.time.replace(/-/g, '/')).getTime() || 0;
+                        return tA - tB;
+                    });
+
+                    await replaceDB(mergedHistory); 
+                    
+                    document.getElementById('chatHistory').innerHTML = document.getElementById('welcomeMessage').outerHTML;
+                    await loadHistoryIntoChat();
+                    
+                    alert('✅ 云端数据拉取成功！已与本地记录完美合并。');
+                } else {
+                    throw new Error("云端数据格式不正确，可能该 Bin 内没有 history 数组");
+                }
+            } catch (error) {
+                console.error('拉取云端记录详细错误:', error);
+                // 诊断强化：弹出具体的错误信息
+                alert('❌ 拉取失败: \n' + error.message + '\n\n请检查配置或 F12 查看控制台红字。');
+            } finally {
+                btn.innerText = originalText;
+                btn.style.opacity = '1';
+                isSyncing = false;
+            }
+        }
+
+
+
+// 新增：专门用于云端删除操作的同步函数（终极防缓存版）
+async function syncDeletionToCloud(urlToDelete) {
+    const config = getCloudConfig();
+    if (!config.apiKey || !config.binId) return; // 没配置云端则跳过
+    
+    try {
+        // 1. 禁用缓存，加入时间戳，强制获取云端最新鲜的数据
+        const getRes = await fetch(`https://api.jsonbin.io/v3/b/${config.binId}/latest?t=${Date.now()}`, {
+            headers: { 'X-Master-Key': config.apiKey },
+            cache: 'no-store' // ⬅️ 关键：绕过浏览器缓存
+        });
+        if (!getRes.ok) return;
+        
+        const data = await getRes.json();
+        let cloudHistory = data.record.history || [];
+        // ⬇️ 新增：保护云端现有的 prompts
+        let cloudPrompts = data.record.prompts || [];
+        // ⬆️ 新增结束
+        
+        // 2. 从云端数组中剔除该记录（如果是清空所有，则设为空数组）
+        // ... (省略中间代码)
+
+        // 3. 将剔除后的干净数据重新覆盖云端
+        await fetch(`https://api.jsonbin.io/v3/b/${config.binId}`, {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-Master-Key': config.apiKey,
+                'X-Bin-Versioning': 'false' 
+            },
+            // ⬇️ 修改：回写历史时携带上保护好的 prompts
+            body: JSON.stringify({ history: cloudHistory, prompts: cloudPrompts }) 
+            // ⬆️ 修改结束
+        });
+
+    } catch (error) {
+        console.error('云端删除同步失败:', error);
+    }
+}
+
+
+
+        // BUG FIX #4：修复配置切换逻辑，确保始终优先读取对应版本的已保存配置
+        function handleVersionSwitch(isInit = false) {
+            const version = document.getElementById('apiVersion').value;
+            localStorage.setItem('hub_apiVersion', version);
+            
+            const imgbbGroup = document.getElementById('imgbbGroup');
+            if (version === 'new' || version === 'alapi') {
+                imgbbGroup.style.display = 'block';
+            } else {
+                imgbbGroup.style.display = 'none';
+            }
+            
+            const topApiSelect = document.getElementById('topApiVersion');
+            if (topApiSelect) topApiSelect.value = version;
+
+            const preset = API_PRESETS[version];
+            const pfx = version + '_';
+            
+            document.getElementById('baseUrl').value = localStorage.getItem(`hub_${pfx}baseUrl`) || preset.url;
+            document.getElementById('apiPath').value = localStorage.getItem(`hub_${pfx}apiPath`) || preset.path;
+            document.getElementById('modelName').value = localStorage.getItem(`hub_${pfx}modelName`) || preset.model;
+            document.getElementById('apiKey').value = localStorage.getItem(`hub_${pfx}apiKey`) || '';
+
+            const sizeSelect = document.getElementById('size');
+            const resPill = document.getElementById('pillResolution');
+            const uploadLabel = document.getElementById('uploadLabel');
+
+            if (!sizeSelect.dataset.orig) {
+                sizeSelect.dataset.orig = sizeSelect.innerHTML; 
+            }
+
+            if (version === 'alapi') {
+                sizeSelect.innerHTML = `
+                    <option value="1536x864">16:9 (1K)</option>
+                    <option value="864x1536">9:16 (1K)</option>
+                    <option value="2048x1024">2:1 (1K)</option>
+                    <option value="1024x2048">1:2 (1K)</option>
+                    <option value="3840x2160">16:9 (4K)</option>
+                    <option value="2160x3840">9:16 (4K)</option>
+                    <option value="3840x1920">2:1 (4K)</option>
+                    <option value="1920x3840">1:2 (4K)</option>
+                `;
+                resPill.style.display = 'none'; 
+                uploadLabel.title = "上传参考图(最多4张)";
+            } else {
+                sizeSelect.innerHTML = sizeSelect.dataset.orig;
+                if (version === 'old') { 
+                    const nodApiSizes = ['1024x1024', '1024x1536', '1536x1024', '941x1672', '1672x941'];
+                    Array.from(sizeSelect.options).forEach(opt => {
+                        opt.style.display = !nodApiSizes.includes(opt.value) ? 'none' : '';
+                    });
+                    if (!nodApiSizes.includes(sizeSelect.value)) sizeSelect.value = '1024x1024';
+                    resPill.style.display = 'none';
+                    uploadLabel.title = "上传参考图(最多5张)";
+                } else { 
+                    Array.from(sizeSelect.options).forEach(opt => opt.style.display = '');
+                    resPill.style.display = 'inline-flex';
+                    uploadLabel.title = "上传参考图(最多10张)";
+                }
+            }
+        }
+
+        function saveConfig() {
+            const version = document.getElementById('apiVersion').value;
+            const pfx = version + '_';
+            localStorage.setItem(`hub_${pfx}baseUrl`, document.getElementById('baseUrl').value.trim());
+            localStorage.setItem(`hub_${pfx}apiPath`, document.getElementById('apiPath').value.trim());
+            localStorage.setItem(`hub_${pfx}modelName`, document.getElementById('modelName').value.trim());
+            localStorage.setItem(`hub_${pfx}apiKey`, document.getElementById('apiKey').value.trim()); 
+            localStorage.setItem(`hub_imgbbApiKey`, document.getElementById('imgbbApiKey').value.trim());
+            
+            localStorage.setItem('hub_cloudApiKey', document.getElementById('cloudApiKey').value.trim());
+            localStorage.setItem('hub_cloudBinId', document.getElementById('cloudBinId').value.trim());
+            
+            alert('当前接口及云端同步配置已统一保存！');
+        }
+
+        function triggerPicker(el) {
+            const sel = el.querySelector('select');
+            try { if (typeof sel.showPicker === 'function') sel.showPicker(); else sel.focus(); } catch (e) { sel.focus(); }
+        }
+
+        function toggleSidebar() {
+            const sidebar = document.getElementById('sidebar');
+            const resizer = document.getElementById('resizer');
+            sidebar.classList.toggle('collapsed');
+            resizer.classList.toggle('collapsed');
+        }
+
+        async function forceDownloadImage(url, filename) {
+            try {
+                const response = await fetch(url);
+                const blob = await response.blob();
+                const blobUrl = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.style.display = 'none';
+                a.href = blobUrl;
+                a.download = filename || `AI_IMG_${Date.now()}.png`;
+                document.body.appendChild(a);
+                a.click();
+                window.URL.revokeObjectURL(blobUrl);
+                a.remove();
+            } catch (error) {
+                window.open(url, '_blank');
+            }
+        }
+
+        const resizer = document.getElementById('resizer');
+        const sidebar = document.getElementById('sidebar');
+        let isResizing = false;
+        resizer.addEventListener('mousedown', () => { isResizing = true; document.body.style.cursor = 'col-resize'; document.body.style.userSelect = 'none'; });
+        document.addEventListener('mousemove', (e) => { if (!isResizing) return; requestAnimationFrame(() => { let nw = e.clientX; if (nw < 260) nw = 260; if (nw > document.body.clientWidth * 0.5) nw = document.body.clientWidth * 0.5; sidebar.style.width = nw + 'px'; }); });
+        document.addEventListener('mouseup', () => { isResizing = false; document.body.style.cursor = ''; document.body.style.userSelect = ''; });
+
+        function autoResize(textarea) { textarea.style.height = 'auto'; textarea.style.height = textarea.scrollHeight + 'px'; if(textarea.value === '') textarea.style.height = 'auto'; }
+        function handleEnter(e) { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); executeGeneration(); } }
+        
+        function scrollToBottom() { 
+            const c = document.getElementById('chatHistory'); 
+            c.scrollTo({ top: c.scrollHeight, behavior: 'smooth' }); 
+        }
+
+        // BUG FIX #11：避免移动端软键盘引起误判，调高触发阈值
+        document.getElementById('chatHistory').addEventListener('scroll', function() {
+            const btn = document.getElementById('scrollToBottomBtn');
+            const isNearBottom = this.scrollHeight - this.scrollTop - this.clientHeight < 120;
+            if (isNearBottom) {
+                btn.classList.remove('show');
+            } else {
+                btn.classList.add('show');
+            }
+        });
+
+        function compressImageAsync(file) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    const img = new Image();
+                    img.onload = () => {
+                        let width = img.width;
+                        let height = img.height;
+                        const maxDim = 4096;
+
+                        if (width > maxDim || height > maxDim) {
+                            if (width > height) {
+                                height = Math.round((height * maxDim) / width);
+                                width = maxDim;
+                            } else {
+                                width = Math.round((width * maxDim) / height);
+                                height = maxDim;
+                            }
+                            const canvas = document.createElement('canvas');
+                            canvas.width = width;
+                            canvas.height = height;
+                            const ctx = canvas.getContext('2d');
+                            ctx.fillStyle = "#FFFFFF";
+                            ctx.fillRect(0, 0, canvas.width, canvas.height);
+                            ctx.drawImage(img, 0, 0, width, height);
+                            resolve(canvas.toDataURL('image/jpeg', 0.9)); 
+                        } else {
+                            resolve(e.target.result);
+                        }
+                    };
+                    img.onerror = () => reject(new Error('图片解析失败'));
+                    img.src = e.target.result;
+                };
+                reader.onerror = () => reject(new Error('文件读取失败'));
+                reader.readAsDataURL(file);
+            });
+        }
+
+        async function processFiles(files) {
+            if (files.length === 0) return;
+            const version = document.getElementById('apiVersion').value;
+            
+            let maxImages = 10;
+            if (version === 'old') maxImages = 5;
+            if (version === 'alapi') maxImages = 4; 
+
+            let currentCount = refImagesBase64.length;
+            
+            for (let file of files) {
+                if (!file.type.startsWith('image/')) continue; 
+                if (currentCount >= maxImages) { 
+                    if (currentCount === maxImages) alert(`当前接口协议最多只能上传${maxImages}张参考图`); 
+                    currentCount++; 
+                    continue; 
+                }
+                currentCount++; 
+                
+                try {
+                    const b64 = await compressImageAsync(file);
+                    
+                    if (refImagesBase64.includes(b64) || refImagesBase64.length >= maxImages) continue;
+                    refImagesBase64.push(b64);
+                } catch (err) {
+                    console.error("图片处理异常:", err);
+                }
+            }
+            
+            // XSS FIX: 不再手动拼接 HTML，统一交给 renderPreviewArea 闭包处理
+            if (typeof renderPreviewArea === 'function') {
+                renderPreviewArea();
+            }
+        }
+
+        document.getElementById('refImages').addEventListener('change', async (e) => {
+            await processFiles(Array.from(e.target.files));
+            e.target.value = ''; 
+        });
+
+        // ================= 解决 PakePlus 拖拽文件失效问题 =================
+        document.addEventListener('dragenter', (e) => { 
+            e.preventDefault(); 
+            e.stopPropagation(); 
+        }, false);
+        
+        document.addEventListener('dragover', (e) => { 
+            e.preventDefault(); 
+            e.stopPropagation(); 
+            e.dataTransfer.dropEffect = 'copy'; 
+            
+            const inputBox = document.querySelector('.input-box');
+            if(inputBox) inputBox.style.borderColor = 'var(--primary-blue)'; 
+        }, false);
+        
+        document.addEventListener('dragleave', (e) => { 
+            e.preventDefault(); 
+            e.stopPropagation(); 
+            const inputBox = document.querySelector('.input-box');
+            if(inputBox) inputBox.style.borderColor = ''; 
+        }, false);
+        
+        document.addEventListener('drop', async (e) => {
+            e.preventDefault(); 
+            e.stopPropagation(); 
+            const inputBox = document.querySelector('.input-box');
+            if(inputBox) inputBox.style.borderColor = '';
+            
+            if (e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+                // BUG FIX #10：过滤非图片文件，防止直接抛出异常
+                const validFiles = Array.from(e.dataTransfer.files).filter(file => file.type.startsWith('image/'));
+                if (validFiles.length > 0) {
+                    await processFiles(validFiles);
+                }
+            }
+        }, false);
+
+// ================= 增加：全局支持 Ctrl+V 粘贴截图上传 =================
+        document.addEventListener('paste', async (e) => {
+            // 检查剪贴板中是否有数据，并且是否包含文件
+            if (e.clipboardData && e.clipboardData.files && e.clipboardData.files.length > 0) {
+                // 过滤出真正的图片文件（防止用户粘贴了个压缩包或其他文件过来）
+                const validFiles = Array.from(e.clipboardData.files).filter(file => file.type.startsWith('image/'));
+                
+                if (validFiles.length > 0) {
+                    // 阻止默认的粘贴行为（防止图片变成奇怪的 Base64 文本挤进文本框里）
+                    e.preventDefault(); 
+                    // 直接复用我们极其健壮的图片处理和渲染函数！
+                    await processFiles(validFiles);
+                }
+            }
+            // 注：如果不包含图片文件（比如用户只是在粘贴纯文本提示词），
+            // 代码会直接无视，让浏览器的默认粘贴文字行为正常发生。
+        }, false);
+
+
+// ================= 修改：在历史图片下方加入涂鸦按钮，彻底防御 XSS 注入 (BUG FIX 终极版) =================
+        async function loadHistoryIntoChat() {
+            const history = await getHistoryFromDB();
+            if (history.length === 0) return;
+            const chatHistory = document.getElementById('chatHistory');
+            for (let i = history.length - 1; i >= 0; i--) {
+                const item = history[i];
+                const block = document.createElement('div');
+                block.className = 'history-block';
+                block.dataset.url = item.url; 
+                const extraInfo = item.sizeLabel ? ` | 规格: ${item.sizeLabel} | 耗时: ${item.timeTaken}秒 | 预估花费: ￥${item.price}` : '';
+                
+                // XSS 防御：将 url 的双引号转义，存入 data-url 中
+                const safeUrl = item.url ? item.url.replace(/"/g, '&quot;') : '';
+                
+                // XSS 防御：利用 dataset 传值，彻底杜绝单引号截断导致的脚本注入风险
+
+
+// 修改 block.innerHTML 的赋值，给 user-msg 左侧追加 ✎ 按钮
+                block.innerHTML = `
+                    <div class="message-row user-msg">
+                        <div class="edit-msg-btn" title="编辑并重新发送" onclick="editUserMessage(this)">✎</div>
+                        <div class="bubble"><div class="bubble-text">${item.prompt ? item.prompt.replace(/\n/g, '<br>') : '未填写提示词'}</div></div>
+                        <div class="avatar">我</div>
+                    </div>
+                    <div class="message-row ai-msg"><div class="avatar">AI</div><div class="bubble"><div class="bubble-text info-text" style="color: var(--text-muted); font-size: 12px; margin-bottom: 4px;">⏱ ${item.time || '历史记录'}${extraInfo} | 接口: ${item.apiSource || '未知'} <span class="btn-delete-record" onclick="deleteHistoryItem(this.closest('.history-block').dataset.url, this)">删除记录</span></div><div class="image-grid"><div class="image-card">
+                        <img src="${item.url}" data-url="${safeUrl}" onerror="autoRemoveBrokenLink(this.dataset.url, this)">
+                        <div class="btn-download" data-editor-url="${safeUrl}" onclick="openImageEditor(this.dataset.editorUrl)" style="margin-top: 6px; background: #e3effd; color: var(--primary-blue);">🖍️ 涂鸦作为参考图</div>
+                    </div></div></div></div>
+                `;
+
+
+
+                chatHistory.appendChild(block);
+            }
+            setTimeout(() => { 
+                const c = document.getElementById('chatHistory'); 
+                c.scrollTo({ top: c.scrollHeight, behavior: 'auto' }); 
+            }, 10);
+        }
+
+
+async function saveToHistory(url, prompt, apiSource, sizeLabel, timeTaken, price) {
+            // 修改点：抽离出单条新增数据对象
+            const newItem = { 
+                url: url, 
+                prompt: prompt || '未填写提示词', 
+                time: new Date().toLocaleString('zh-CN', { hour12: false }), 
+                apiSource: apiSource || '未知',
+                sizeLabel: sizeLabel || '',
+                timeTaken: timeTaken || '',
+                price: price || ''
+            };
+            await saveToDB(newItem); // 存入本地
+            triggerSilentSync(newItem); // 修改点：将这 1 条新数据直接抛给云端同步引擎
+        }
+
+
+// 修改后：
+async function deleteHistoryItem(url, btnElement) {
+    if (confirm('确认删除此记录吗？')) {
+        await deleteFromDBByUrl(url);
+        const block = btnElement.closest('.history-block');
+        if(block) { block.style.opacity = '0'; block.style.transition = 'opacity 0.3s'; setTimeout(() => block.remove(), 300); }
+        syncDeletionToCloud(url); // ⬅️ 改用精准删除同步
+    }
+}
+
+// 修改后：
+async function clearAllHistory() {
+    if (confirm('警告：此操作将清空所有聊天记录，且无法恢复，是否继续？')) {
+        await clearDB();
+        document.getElementById('chatHistory').innerHTML = document.getElementById('welcomeMessage').outerHTML; 
+        syncDeletionToCloud('ALL'); // ⬅️ 传入 'ALL' 标识清空云端
+    }
+}
+
+
+function appendUserMessage(text, images) {
+            const history = document.getElementById('chatHistory');
+            let imgHtml = images && images.length > 0 ? `<div class="bubble-images-sent">` + images.map(img => `<img src="${img}">`).join('') + `</div>` : '';
+            const block = document.createElement('div');
+            block.className = 'history-block';
+            
+            // 修改了这里的 HTML，左侧追加了 ✎ 按钮
+            block.innerHTML = `
+                <div class="message-row user-msg">
+                    <div class="edit-msg-btn" title="编辑并重新发送" onclick="editUserMessage(this)">✎</div>
+                    <div class="bubble">${imgHtml}${text ? `<div class="bubble-text">${text.replace(/\n/g, '<br>')}</div>` : ''}</div>
+                    <div class="avatar">我</div>
+                </div>
+            `;
+            
+            history.appendChild(block);
+            scrollToBottom();
+            return block;
+        }
+
+
+
+
+        function appendAILoadingMessage(blockNode, msgId, count) {
+            const msg = document.createElement('div');
+            msg.className = 'message-row ai-msg';
+            msg.id = msgId;
+            let gridHtml = '';
+            for(let i=0; i<count; i++) gridHtml += `<div class="image-card" id="${msgId}_card_${i}"><div class="skeleton">任务调度中...</div></div>`;
+            msg.innerHTML = `<div class="avatar">AI</div><div class="bubble"><div class="bubble-text info-text" style="color: var(--text-muted); font-size: 13px;">与引擎建立连接...</div><div class="image-grid">${gridHtml}</div></div>`;
+            blockNode.appendChild(msg);
+            scrollToBottom();
+            return msg;
+        }
+
+        async function pollNewApiTask(baseUrl, taskId, apiKey, cardElement) {
+            const pollUrl = `${baseUrl}/v1/media/status?task_id=${taskId}`;
+            cardElement.innerHTML = `<div class="skeleton">任务分配成功，正在绘制中...</div>`;
+            
+            let retryCount = 0;
+            while (true) {
+                await new Promise(r => setTimeout(r, 3500)); 
+                retryCount++;
+                
+                const res = await fetch(pollUrl, { headers: { 'Authorization': `Bearer ${apiKey}` } });
+                const data = await res.json();
+                
+                if (data.is_final) {
+                    if (data.state === 'success') return data.result_url;
+                    throw new Error(data.error || '云端引擎处理失败');
+                }
+                
+                if (retryCount >= 60) {
+                    throw new Error("云端绘制超时 (已等待3.5分钟)，请尝试重试此图。");
+                }
+            }
+        }
+
+        async function pollAlapiTask(baseUrl, taskId, apiKey, cardElement) {
+            const pollUrl = `${baseUrl}/api/ai/images/generations/task`;
+            cardElement.innerHTML = `<div class="skeleton">任务分配成功，正在云端绘制中...</div>`;
+            
+            let retryCount = 0;
+            while (true) {
+                await new Promise(r => setTimeout(r, 4000)); 
+                retryCount++;
+
+                const response = await fetch(pollUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ token: apiKey, task_id: taskId })
+                });
+                const data = await response.json();
+                
+                if (data.code !== 200) throw new Error(data.msg || '查询任务状态失败');
+                
+                const rawStatus = data.data?.status || data.status || 'unknown';
+                const statusStr = String(rawStatus).toLowerCase();
+                
+                if (statusStr === 'success' || statusStr === 'succeeded' || statusStr === 'finished' || statusStr === 'completed' || statusStr === 'done') {
+                    let url = data.data?.result?.images?.[0]?.url || 
+                              data.data?.image_url || 
+                              data.data?.url || 
+                              data.image_url;
+                              
+                    if (Array.isArray(url)) url = url[0]; 
+                    if (!url) throw new Error("生成成功，但未找到图片链接");
+                    return url;
+                } else if (statusStr === 'failed' || statusStr === 'error' || statusStr === 'fail') {
+                    throw new Error(data.data?.error || data.msg || '云端引擎处理失败');
+                }
+
+                if (retryCount >= 45) { 
+                    throw new Error("等待超时，接口一直未返回最终状态");
+                }
+            }
+        }
+
+        async function uploadToImageBed(base64Str) {
+            const UPLOAD_API_URL = 'https://api.imgbb.com/1/upload'; 
+            const UPLOAD_TOKEN = document.getElementById('imgbbApiKey').value.trim(); 
+            if (!UPLOAD_TOKEN) {
+                throw new Error("请先在左侧配置 ImgBB 图床 API 令牌");
+            }
+
+            const rawBase64 = base64Str.split(',')[1];
+            const formData = new FormData();
+            formData.append('key', UPLOAD_TOKEN);
+            formData.append('image', rawBase64); 
+            formData.append('expiration', '600'); 
+
+            try {
+                const response = await fetch(UPLOAD_API_URL, {
+                    method: 'POST',
+                    body: formData
+                });
+                const data = await response.json();
+                if (data && data.success) { 
+                    return data.data.url; 
+                } else {
+                    throw new Error(data.error ? data.error.message : "图床上传失败");
+                }
+            } catch (error) {
+                throw new Error("图床上传异常：" + error.message);
+            }
+        }
+
+        const apiAdapters = {
+            'old': async (cardIndex, cardDOM, rawPrompt, sharedPublicImageUrls, endpoint, apiKey, baseUrl, msgId) => {
+                let payload = {
+                    model: document.getElementById('modelName').value,
+                    prompt: rawPrompt,
+                    size: document.getElementById('size').value,
+                    n: 1 
+                };
+                if (sharedPublicImageUrls && sharedPublicImageUrls.length > 0) {
+                    payload.image = sharedPublicImageUrls; 
+                }
+                
+                const response = await fetch(endpoint, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
+                    body: JSON.stringify(payload)
+                });
+                const data = await response.json();
+                if(msgId && rawDataStore[msgId]) rawDataStore[msgId].push({ type: 'old_sync', data });
+
+                if (!response.ok) throw new Error(data.error?.message || data.message || `HTTP 异常: ${response.status}`);
+                if (data.data && data.data[0] && data.data[0].url) {
+                    return data.data[0].url;
+                } else if (data.choices && data.choices[0] && data.choices[0].message) {
+                    const match = data.choices[0].message.content.match(/(https?:\/\/[^\s\)"'\]]+)/);
+                    if (match) return match[1];
+                }
+                throw new Error("接口未返回可用的图像链接");
+            },
+            'new': async (cardIndex, cardDOM, rawPrompt, sharedPublicImageUrls, endpoint, apiKey, baseUrl, msgId) => {
+                let payload = {
+                    model: document.getElementById('modelName').value,
+                    prompt: rawPrompt,
+                    params: {
+                        size: document.getElementById('size').value,
+                        quality: document.getElementById('resolution').value
+                    }
+                };
+                if (sharedPublicImageUrls && sharedPublicImageUrls.length > 0) payload.params.images = sharedPublicImageUrls;
+                
+                cardDOM.innerHTML = `<div class="skeleton">正在提交生图任务...</div>`;
+                const response = await fetch(endpoint, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
+                    body: JSON.stringify(payload)
+                });
+                const data = await response.json();
+                if(msgId && rawDataStore[msgId]) rawDataStore[msgId].push({ type: 'new_init', data });
+                
+                if (!response.ok || !data.data?.task_id) throw new Error(data.msg || data.error?.message || `HTTP 异常: ${response.status}`);
+                return await pollNewApiTask(baseUrl, data.data.task_id, apiKey, cardDOM);
+            },
+            'alapi': async (cardIndex, cardDOM, rawPrompt, sharedPublicImageUrls, endpoint, apiKey, baseUrl, msgId) => {
+                let exactPixels = document.getElementById('size').value;
+                let alapiRes = "1k";
+                if (["1152x2048", "2048x1152", "1344x2688", "2688x1344"].includes(exactPixels)) {
+                    alapiRes = "2k";
+                }
+
+                let payload = {
+                    token: apiKey, 
+                    model: document.getElementById('modelName').value,
+                    prompt: rawPrompt,
+                    n: 1, 
+                    size: exactPixels, 
+                    resolution: alapiRes 
+                };
+
+                if (sharedPublicImageUrls && sharedPublicImageUrls.length > 0) {
+                    payload.image_urls = sharedPublicImageUrls; 
+                }
+
+                cardDOM.innerHTML = `<div class="skeleton">正在提交生图任务...</div>`;
+                const response = await fetch(endpoint, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                const data = await response.json();
+                if(msgId && rawDataStore[msgId]) rawDataStore[msgId].push({ type: 'alapi_init', data });
+
+                if (!response.ok || data.code !== 200 || !data.data?.task_id) {
+                    throw new Error(data.msg || data.message || `云端引擎处理失败`);
+                }
+
+                return await pollAlapiTask(baseUrl, data.data.task_id, apiKey, cardDOM);
+            }
+        };
+
+        window.retrySingleTask = async function(taskId) {
+            const ctx = window.failedTasks[taskId];
+            if (!ctx) return;
+            const startTime = Date.now();
+            const { version, cardIndex, cardDOM, rawPrompt, sharedPublicImageUrls, endpoint, apiKey, baseUrl, apiLabel, msgId, sessionBlock, sizeLabel, price } = ctx;
+
+            cardDOM.innerHTML = `<div class="skeleton">重新调度任务...</div>`;
+            activeTaskCount++;
+            
+            try {
+                const imageUrl = await apiAdapters[version](cardIndex, cardDOM, rawPrompt, sharedPublicImageUrls, endpoint, apiKey, baseUrl, msgId);
+                if (imageUrl) {
+                    // XSS 防御安全注入
+                    const safeUrl = imageUrl.replace(/"/g, '&quot;');
+                    cardDOM.innerHTML = `
+                        <img src="${imageUrl}" data-url="${safeUrl}" onerror="autoRemoveBrokenLink(this.dataset.url, this)">
+                        <div class="btn-download" data-editor-url="${safeUrl}" onclick="openImageEditor(this.dataset.editorUrl)" style="margin-top: 6px; background: #e3effd; color: var(--primary-blue);">🖍️ 涂鸦作为参考图</div>
+                    `;
+                    const timeTakenImg = ((Date.now() - startTime) / 1000).toFixed(1);
+                    await saveToHistory(imageUrl, rawPrompt, apiLabel, sizeLabel || '未知', timeTakenImg, price || '0.000');
+                    sessionBlock.dataset.url = imageUrl;
+                    delete window.failedTasks[taskId]; 
+                }
+            } catch (error) {
+                cardDOM.innerHTML = `<div class="skeleton" style="color:#dc2626; background:#fef2f2; border: 1px solid #fca5a5; display: flex; flex-direction: column; gap: 8px;">
+                    <span>重试失败:<br>${error.message}</span>
+                    <div class="btn-download" style="border: 1px solid #dc2626; color: #dc2626; background: transparent; width: fit-content; margin: 0 auto;" onclick="retrySingleTask('${taskId}')">再次重试</div>
+                </div>`;
+            } finally {
+                activeTaskCount--;
+            }
+        }
+
+        async function executeGeneration() {
+            const apiKey = document.getElementById('apiKey').value.trim();
+            const rawPrompt = document.getElementById('prompt').value.trim();
+            
+            if (!apiKey) return alert('请先在左侧配置 API 令牌。');
+            if (!rawPrompt && refImagesBase64.length === 0) return alert('请输入提示词或上传参考图。');
+
+            activeTaskCount++; // 整个批次任务的顶级锁定标记
+
+            try {
+                const startTime = Date.now();
+                const version = document.getElementById('apiVersion').value; 
+                const apiLabel = version === 'old' ? 'nodapi.com' : (version === 'new' ? 'jc.ai6800.com' : 'v3.alapi.cn');
+                let baseUrl = document.getElementById('baseUrl').value.trim().replace(/\/+$/, '');
+                let apiPath = document.getElementById('apiPath').value.trim();
+                const requestCount = parseInt(document.getElementById('n').value) || 1;
+
+                if (!/^https?:\/\//i.test(baseUrl)) baseUrl = 'https://' + baseUrl;
+                if (!apiPath.startsWith('/')) apiPath = '/' + apiPath;
+                const endpoint = baseUrl + apiPath;
+
+                const capturedImages = [...refImagesBase64];
+                
+                const sizeSelect = document.getElementById('size');
+                const sizeLabel = sizeSelect.options[sizeSelect.selectedIndex].text;
+                let pricePerImage = 0;
+                if (version === 'old') pricePerImage = 0.133;
+                else if (version === 'new') pricePerImage = 0.094;
+                else if (version === 'alapi') {
+                    let multiplier = 1;
+                    if (sizeLabel.includes('2K')) multiplier = 2;
+                    else if (sizeLabel.includes('4K')) multiplier = 3;
+                    pricePerImage = 0.05 * multiplier;
+                }
+                const priceStr = pricePerImage.toFixed(3);
+
+                let sharedPublicImageUrls = [];
+                if (version === 'old') {
+                    sharedPublicImageUrls = capturedImages; 
+                }
+
+                const sessionBlock = appendUserMessage(rawPrompt, capturedImages);
+                
+                document.getElementById('prompt').value = '';
+                document.getElementById('prompt').style.height = 'auto';
+                document.getElementById('previewArea').innerHTML = '';
+                refImagesBase64 = [];
+
+                const msgId = 'msg_' + Date.now();
+                const aiMsgNode = appendAILoadingMessage(sessionBlock, msgId, requestCount);
+                rawDataStore[msgId] = [];
+
+                let successCount = 0;
+
+                if ((version === 'new' || version === 'alapi') && capturedImages.length > 0) {
+                    try {
+                        for(let i = 0; i < requestCount; i++) {
+                            const c = document.getElementById(`${msgId}_card_${i}`);
+                            if(c) c.innerHTML = `<div class="skeleton">正在上传参考图...</div>`;
+                        }
+                        
+                        for (let b64 of capturedImages) {
+                            const uploadedUrl = await uploadToImageBed(b64); 
+                            sharedPublicImageUrls.push(uploadedUrl);
+                        }
+                    } catch (err) {
+                        for(let i = 0; i < requestCount; i++) {
+                            const c = document.getElementById(`${msgId}_card_${i}`);
+                            if(c) c.innerHTML = `<div class="skeleton" style="color:#dc2626; background:#fef2f2; border: 1px solid #fca5a5;">图床上传失败:<br>${err.message}</div>`;
+                        }
+                        return; // 上传失败直接阻断
+                    }
+                }
+
+                const tasks = Array.from({length: requestCount}).map(async (_, i) => {
+                    const card = document.getElementById(`${msgId}_card_${i}`);
+                    try {
+                        const imageUrl = await apiAdapters[version](i, card, rawPrompt, sharedPublicImageUrls, endpoint, apiKey, baseUrl, msgId);
+
+                        if (imageUrl) {
+                            // XSS 防御安全注入
+                            const safeUrl = imageUrl.replace(/"/g, '&quot;');
+                            card.innerHTML = `
+                                <img src="${imageUrl}" data-url="${safeUrl}" onerror="autoRemoveBrokenLink(this.dataset.url, this)">
+                                <div class="btn-download" data-editor-url="${safeUrl}" onclick="openImageEditor(this.dataset.editorUrl)" style="margin-top: 6px; background: #e3effd; color: var(--primary-blue);">🖍️ 涂鸦作为参考图</div>
+                            `;
+                            successCount++;
+                            const timeTakenImg = ((Date.now() - startTime) / 1000).toFixed(1);
+                            await saveToHistory(imageUrl, rawPrompt, apiLabel, sizeLabel, timeTakenImg, priceStr);
+                            sessionBlock.dataset.url = imageUrl;
+                        }
+                    } catch (error) {
+                        const taskId = msgId + '_' + i;
+                        window.failedTasks[taskId] = { version, cardIndex: i, cardDOM: card, rawPrompt, sharedPublicImageUrls, endpoint, apiKey, baseUrl, apiLabel, msgId, sessionBlock, sizeLabel, price: priceStr };
+                        card.innerHTML = `<div class="skeleton" style="color:#dc2626; background:#fef2f2; border: 1px solid #fca5a5; display: flex; flex-direction: column; gap: 8px;">
+                            <span>生成失败:<br>${error.message}</span>
+                            <div class="btn-download" style="border: 1px solid #dc2626; color: #dc2626; background: transparent; width: fit-content; margin: 0 auto;" onclick="retrySingleTask('${taskId}')">重试此图</div>
+                        </div>`;
+                    }
+                });
+
+                await Promise.all(tasks);
+
+                const timeTakenTotal = ((Date.now() - startTime) / 1000).toFixed(1);
+                const totalPrice = (pricePerImage * successCount).toFixed(3);
+
+                aiMsgNode.querySelector('.info-text').innerHTML = `生成完成 (成功 ${successCount}/${requestCount} 张) | 规格: ${sizeLabel} | 耗时: ${timeTakenTotal}秒 | 预估花费: ￥${totalPrice} | 接口: ${apiLabel} <span class="btn-delete-record" onclick="deleteHistoryItem(this.closest('.history-block').dataset.url, this)">删除记录</span>`;
+                
+                const rawBtn = document.createElement('div');
+                rawBtn.className = 'raw-data-btn';
+                rawBtn.innerText = '查看底层响应 (Raw JSON)';
+                rawBtn.onclick = () => {
+                    const printWin = window.open('', '', 'width=800,height=600');
+                    printWin.document.write('<pre style="white-space: pre-wrap; font-family: monospace; font-size: 13px; padding: 20px;">' + JSON.stringify(rawDataStore[msgId], null, 2) + '</pre>');
+                };
+                aiMsgNode.querySelector('.bubble').appendChild(rawBtn);
+
+                scrollToBottom();
+
+            } finally {
+                // 确保全流程跑完或意外崩溃后，释放页面关闭拦截锁
+                activeTaskCount--;
+            }
+        }
+
+
+// ================= 升级版看图器 (多图切换、缩放、拖拽) =================
+        let viewerImages = [];
+        let viewerIndex = 0;
+        let vZoom = 1, vPanX = 0, vPanY = 0, isDraggingViewer = false, vStartX, vStartY;
+
+        document.getElementById('chatHistory').addEventListener('click', (e) => {
+            if (e.target.tagName === 'IMG' && (e.target.closest('.image-card') || e.target.closest('.bubble-images-sent'))) {
+                // 自动收集当前页面内所有可预览的图片，加入画廊队列
+                const imgs = Array.from(document.getElementById('chatHistory').querySelectorAll('.image-card img, .bubble-images-sent img'));
+                viewerImages = imgs.map(img => img.src);
+                viewerIndex = viewerImages.indexOf(e.target.src);
+                if(viewerIndex === -1) { viewerImages = [e.target.src]; viewerIndex = 0; }
+                showImagePreview(viewerImages[viewerIndex]);
+            }
+        });
+
+        function showImagePreview(src) {
+            const viewer = document.getElementById('imageViewer');
+            document.getElementById('fullImage').src = src;
+            viewer.style.display = 'flex';
+            resetViewerState();
+        }
+
+        function closeViewer(e) {
+            if (e) e.stopPropagation();
+            document.getElementById('imageViewer').style.display = 'none';
+            document.getElementById('fullImage').src = ''; 
+        }
+
+        function navigateViewer(step, e) {
+            if(e) e.stopPropagation();
+            if(viewerImages.length <= 1) return;
+            viewerIndex = (viewerIndex + step + viewerImages.length) % viewerImages.length;
+            document.getElementById('fullImage').src = viewerImages[viewerIndex];
+            resetViewerState();
+        }
+
+        function resetViewerState() {
+            vZoom = 1; vPanX = 0; vPanY = 0;
+            updateViewerTransform();
+        }
+
+        function updateViewerTransform() {
+            document.getElementById('fullImage').style.transform = `translate(${vPanX}px, ${vPanY}px) scale(${vZoom})`;
+        }
+
+        // 看图器鼠标滚轮缩放
+        document.getElementById('imageViewer').addEventListener('wheel', (e) => {
+            if (e.target.id !== 'fullImage' && e.target.id !== 'imageViewer') return;
+            e.preventDefault();
+            const zoomDelta = e.deltaY > 0 ? -0.15 : 0.15;
+            vZoom = Math.max(0.2, Math.min(vZoom + zoomDelta, 8)); // 支持放大到 800%
+            updateViewerTransform();
+        }, {passive: false});
+
+        // 看图器鼠标拖拽平移
+        const fullImg = document.getElementById('fullImage');
+        fullImg.addEventListener('mousedown', (e) => {
+            e.preventDefault();
+            isDraggingViewer = true;
+            vStartX = e.clientX - vPanX;
+            vStartY = e.clientY - vPanY;
+            fullImg.style.cursor = 'grabbing';
+        });
+        window.addEventListener('mousemove', (e) => {
+            if(!isDraggingViewer) return;
+            vPanX = e.clientX - vStartX;
+            vPanY = e.clientY - vStartY;
+            updateViewerTransform();
+        });
+        window.addEventListener('mouseup', () => {
+            isDraggingViewer = false;
+            fullImg.style.cursor = 'grab';
+        });
+
+        // 键盘左右键切换与 ESC 退出
+        window.addEventListener('keydown', (e) => {
+            if(document.getElementById('imageViewer').style.display === 'flex') {
+                if(e.key === 'ArrowLeft') navigateViewer(-1);
+                if(e.key === 'ArrowRight') navigateViewer(1);
+                if(e.key === 'Escape') closeViewer();
+            }
+        });
+
+        document.getElementById('imageViewer').onclick = function(e) {
+            if(e.target === this) closeViewer();
+        };
+
+
+// ================= 涂鸦编辑器核心功能 (专业快捷键版) =================
+        let dCanvas = document.getElementById('doodleCanvas');
+        let dCtx = dCanvas.getContext('2d');
+        let isDoodling = false;
+        let doodleTool = 'brush'; 
+        let doodleImage = new Image();
+        let currentOriginalUrl = '';
+        let historyStack = [];
+        
+        // 涂鸦缩放与拖拽相关变量
+        let baseDoodleWidth = 0;
+        let baseDoodleHeight = 0;
+        let doodleZoom = 1;
+        let isPanningDoodle = false;
+        let isSpacePressed = false; // 监听空格键状态
+        let panStartX, panStartY, panScrollLeft, panScrollTop;
+
+        function saveState() {
+            historyStack.push(dCtx.getImageData(0, 0, dCanvas.width, dCanvas.height));
+            if (historyStack.length > 20) historyStack.shift();
+        }
+
+        function undoDoodle() {
+            if (historyStack.length > 1) {
+                historyStack.pop(); 
+                dCtx.putImageData(historyStack[historyStack.length - 1], 0, 0); 
+            }
+        }
+
+        function setDoodleTool(tool) {
+            doodleTool = tool;
+            document.getElementById('toolBrush').classList.remove('active');
+            document.getElementById('toolText').classList.remove('active');
+            
+            if(tool === 'brush') document.getElementById('toolBrush').classList.add('active');
+            if(tool === 'text') document.getElementById('toolText').classList.add('active');
+            
+            if (!isSpacePressed && !isPanningDoodle) {
+                dCanvas.style.cursor = tool === 'text' ? 'text' : 'crosshair';
+            }
+        }
+
+        async function openImageEditor(src) {
+            document.getElementById('doodleEditor').style.display = 'flex';
+            currentOriginalUrl = src;
+            setDoodleTool('brush');
+            
+            doodleImage = new Image();
+            doodleImage.crossOrigin = "anonymous"; 
+            try {
+                const response = await fetch(src);
+                const blob = await response.blob();
+                const blobUrl = URL.createObjectURL(blob);
+                doodleImage.onload = () => { initCanvasWithImage(); URL.revokeObjectURL(blobUrl); };
+                doodleImage.src = blobUrl;
+            } catch (error) {
+                doodleImage = new Image();
+                doodleImage.crossOrigin = "anonymous"; 
+                doodleImage.onload = initCanvasWithImage;
+                doodleImage.src = src;
+            }
+        }  
+
+        function initCanvasWithImage() {
+            let maxW = window.innerWidth * 0.85; 
+            let ratio = Math.min(maxW / doodleImage.width, 1); 
+            dCanvas.width = doodleImage.width;
+            dCanvas.height = doodleImage.height;
+            
+            baseDoodleWidth = doodleImage.width * ratio;
+            baseDoodleHeight = doodleImage.height * ratio;
+            doodleZoom = 1;
+            updateDoodleScale();
+            
+            dCtx.lineCap = 'round';
+            dCtx.lineJoin = 'round';
+            clearDoodle(); 
+            historyStack = []; 
+            saveState();
+        }
+
+        function clearDoodle() {
+            dCtx.clearRect(0, 0, dCanvas.width, dCanvas.height);
+            dCtx.drawImage(doodleImage, 0, 0);
+        }
+
+        function closeDoodleEditor() {
+            document.getElementById('doodleEditor').style.display = 'none';
+        }
+
+        function getPos(e) {
+            const rect = dCanvas.getBoundingClientRect();
+            const scaleX = dCanvas.width / rect.width;
+            const scaleY = dCanvas.height / rect.height;
+            let clientX = e.clientX;
+            let clientY = e.clientY;
+            if(e.touches && e.touches.length > 0) {
+                clientX = e.touches[0].clientX;
+                clientY = e.touches[0].clientY;
+            }
+            return {
+                x: (clientX - rect.left) * scaleX,
+                y: (clientY - rect.top) * scaleY
+            };
+        }
+
+        function changeDoodleZoom(delta) {
+            doodleZoom = Math.max(0.2, Math.min(doodleZoom + delta, 5));
+            updateDoodleScale();
+        }
+
+        function updateDoodleScale() {
+            dCanvas.style.width = (baseDoodleWidth * doodleZoom) + 'px';
+            dCanvas.style.height = (baseDoodleHeight * doodleZoom) + 'px';
+            const zoomTxt = document.getElementById('doodleZoomTxt');
+            if(zoomTxt) zoomTxt.innerText = Math.round(doodleZoom * 100) + '%';
+        }
+
+        // ================= 专业防 Bug 快捷键逻辑 =================
+
+        // 1. 全局监听空格键
+        window.addEventListener('keydown', (e) => {
+            // 如果编辑器打开，且按下了空格，且当前不是在原生 prompt 里输入文字
+            if (e.code === 'Space' && document.getElementById('doodleEditor').style.display === 'flex') {
+                e.preventDefault(); // 致命 Bug 修复：防止按空格导致页面往下翻滚
+                if (!isSpacePressed) {
+                    isSpacePressed = true;
+                    if (!isPanningDoodle) dCanvas.style.cursor = 'grab'; // 变成抓手预览
+                }
+            }
+        });
+
+        window.addEventListener('keyup', (e) => {
+            if (e.code === 'Space') {
+                isSpacePressed = false;
+                if (!isPanningDoodle) {
+                    dCanvas.style.cursor = doodleTool === 'text' ? 'text' : 'crosshair'; // 恢复原工具指针
+                }
+            }
+        });
+
+        // 2. 直接滚轮缩放画布
+        document.querySelector('.doodle-canvas-container').addEventListener('wheel', (e) => {
+            e.preventDefault(); // 致命 Bug 修复：防止滚轮导致背后原本的网页上下滚动
+            const zoomDelta = e.deltaY > 0 ? -0.15 : 0.15;
+            changeDoodleZoom(zoomDelta);
+        }, {passive: false});
+
+        // 3. 支持 空格+左键 OR 中键 拖拽
+        function startDrawing(e) {
+            // 触发拖拽条件：(按住了空格 且 是鼠标左键/触摸) 或者 (按下了鼠标中键)
+            if ((isSpacePressed && (e.button === 0 || e.touches)) || e.button === 1) {
+                e.preventDefault(); // 致命 Bug 修复：防止中键触发浏览器自带的全向滚动球
+                isPanningDoodle = true;
+                panStartX = e.clientX || (e.touches && e.touches[0].clientX);
+                panStartY = e.clientY || (e.touches && e.touches[0].clientY);
+                const container = document.querySelector('.doodle-canvas-container');
+                panScrollLeft = container.scrollLeft;
+                panScrollTop = container.scrollTop;
+                dCanvas.style.cursor = 'grabbing'; // 变成用力抓的指针
+                return;
+            }
+
+            // 防御：如果是点击右键，直接忽略
+            if (e.button !== undefined && e.button !== 0) return;
+
+            // 正常画笔逻辑
+            if (doodleTool !== 'brush') return;
+            e.preventDefault();
+            isDoodling = true;
+            const pos = getPos(e);
+            dCtx.beginPath();
+            dCtx.moveTo(pos.x, pos.y);
+            dCtx.strokeStyle = document.getElementById('doodleColor').value;
+            dCtx.lineWidth = document.getElementById('doodleSize').value;
+        }
+
+        function draw(e) {
+            // 如果处于拖拽状态
+            if (isPanningDoodle) {
+                e.preventDefault();
+                let curX = e.clientX || (e.touches && e.touches[0].clientX);
+                let curY = e.clientY || (e.touches && e.touches[0].clientY);
+                const container = document.querySelector('.doodle-canvas-container');
+                container.scrollLeft = panScrollLeft - (curX - panStartX);
+                container.scrollTop = panScrollTop - (curY - panStartY);
+                return;
+            }
+
+            // 正常画笔逻辑
+            if (!isDoodling || doodleTool !== 'brush') return;
+            e.preventDefault();
+            const pos = getPos(e);
+            dCtx.lineTo(pos.x, pos.y);
+            dCtx.stroke();
+        }
+
+        function stopDrawing(e) {
+            // 如果刚才是拖拽状态，释放抓手
+            if (isPanningDoodle) {
+                isPanningDoodle = false;
+                // 判断松手后应该恢复成什么指针
+                dCanvas.style.cursor = isSpacePressed ? 'grab' : (doodleTool === 'text' ? 'text' : 'crosshair');
+                return;
+            }
+
+            // 正常画笔松手
+            if(isDoodling) {
+                dCtx.closePath();
+                isDoodling = false;
+                saveState(); 
+            }
+        }
+
+        function handleCanvasClick(e) {
+            // 防御：如果是按着空格键点的，或者用中键点的，说明是在拖拽，不触发文字弹窗
+            if (isSpacePressed || e.button === 1) return;
+
+            if (doodleTool === 'text') {
+                const text = prompt('请输入要添加的文字：');
+                if (text) {
+                    const pos = getPos(e);
+                    const color = document.getElementById('doodleColor').value;
+                    const size = parseInt(document.getElementById('doodleSize').value) * 6; 
+                    
+                    dCtx.font = `bold ${size}px sans-serif`;
+                    dCtx.fillStyle = color;
+                    dCtx.textBaseline = 'middle';
+                    dCtx.fillText(text, pos.x, pos.y);
+                    
+                    saveState(); 
+                }
+            }
+        }
+
+        // 绑定事件
+        dCanvas.addEventListener('mousedown', startDrawing);
+        dCanvas.addEventListener('mousemove', draw);
+        window.addEventListener('mouseup', stopDrawing);
+        dCanvas.addEventListener('click', handleCanvasClick);
+        dCanvas.addEventListener('touchstart', startDrawing, {passive: false});
+        dCanvas.addEventListener('touchmove', draw, {passive: false});
+        window.addEventListener('touchend', stopDrawing);
+
+
+
+
+        // ================= 彻底防 XSS 的无害 DOM 渲染 =================
+        function renderPreviewArea() {
+            const previewArea = document.getElementById('previewArea');
+            previewArea.innerHTML = ''; 
+            
+            refImagesBase64.forEach(b64 => {
+                const wrap = document.createElement('div');
+                wrap.className = 'thumb-wrap';
+                
+                wrap.innerHTML = `
+                    <img src="${b64}">
+                    <div class="del-thumb">×</div>
+                    <div class="edit-thumb" title="再涂鸦">✎</div>
+                `;
+                
+                // 使用原生闭包绑定事件，100% 杜绝引号截断引发的 XSS 攻击
+                wrap.querySelector('.del-thumb').onclick = () => { 
+                    wrap.remove(); 
+                    refImagesBase64 = refImagesBase64.filter(item => item !== b64); 
+                };
+                wrap.querySelector('.edit-thumb').onclick = () => {
+                    openImageEditor(b64);
+                };
+                // 修改点：增加图片本体的点击预览事件
+                wrap.querySelector('img').onclick = () => {
+                    viewerImages = [...refImagesBase64]; // 将当前待上传的所有图片装入看图器队列，支持左右切换
+                    viewerIndex = viewerImages.indexOf(b64);
+                    showImagePreview(b64);
+                };
+                
+                previewArea.appendChild(wrap);
+            });
+        }
+
+        function saveDoodle() {
+            try {
+                const editedBase64 = dCanvas.toDataURL('image/jpeg', 0.95);
+                closeDoodleEditor();
+                
+                const version = document.getElementById('apiVersion').value;
+                let maxImages = version === 'alapi' ? 4 : (version === 'old' ? 5 : 10);
+                
+                const existingIndex = refImagesBase64.indexOf(currentOriginalUrl);
+                
+                if (existingIndex !== -1) {
+                    refImagesBase64[existingIndex] = editedBase64;
+                } else {
+                    if (refImagesBase64.includes(editedBase64) || refImagesBase64.length >= maxImages) {
+                        alert(`图片重复或已达当前接口上限 (${maxImages}张)`);
+                        return;
+                    }
+                    refImagesBase64.push(editedBase64);
+                }
+                
+                renderPreviewArea(); 
+                
+            } catch (err) {
+                alert("保存失败：该图片所在的服务器设置了跨域读取限制 (CORS)，无法直接提取画板数据。\n\n建议：先将原图右键或点击下载保存到本地电脑，然后手动拖入输入框进行参考。");
+                console.error("Canvas 跨域污染拦截:", err);
+            }
+        }
+
+// ================= 提取并回填用户消息 =================
+        function editUserMessage(btn) {
+            const block = btn.closest('.message-row.user-msg');
+            
+            // 1. 获取文本并还原换行符
+            const textElement = block.querySelector('.bubble-text');
+            let text = textElement ? textElement.innerHTML : '';
+            text = text.replace(/<br\s*[\/]?>/gi, '\n'); // 把 <br> 还原回回车
+            if (text === '未填写提示词') text = '';
+            
+            // 回填文本
+            const promptInput = document.getElementById('prompt');
+            promptInput.value = text;
+            autoResize(promptInput);
+            
+            // 2. 获取图片
+            const imgElements = block.querySelectorAll('.bubble-images-sent img');
+            const images = Array.from(imgElements).map(img => img.src);
+            
+            // 3. 覆盖当前待上传区
+            refImagesBase64 = [...images];
+            if (typeof renderPreviewArea === 'function') {
+                renderPreviewArea();
+            }
+            
+            // 自动聚焦输入框
+            promptInput.focus();
+        }
+
+
+// ================= 新增：提示词管理与解析逻辑 =================
+        function renderPromptLibrary() {
+            const sel = document.getElementById('promptLibrary');
+            if (!sel) return;
+            let prompts = JSON.parse(localStorage.getItem('hub_saved_prompts') || '[]');
+            // 下拉框默认占位符极简优化
+            let html = `<option value="" disabled selected hidden>提示词</option>`;
+            prompts.forEach((p, idx) => {
+                html += `<option value="${idx}">${p.title}</option>`;
+            });
+            html += `<option value="IMPORT">📂 导入文件 (TXT/JSON)</option>`;
+            if (prompts.length > 0) {
+                html += `<option value="MANAGE">⚙️ 管理提示词</option>`;
+            }
+            sel.innerHTML = html;
+        }
+
+        function handlePromptSelect(sel) {
+            const val = sel.value;
+            if (!val) return;
+            
+            if (val === 'IMPORT') {
+                document.getElementById('importPromptsBtn').click();
+                sel.value = "";
+                return;
+            }
+            
+            // 拦截管理选项，呼出弹窗
+            if (val === 'MANAGE') {
+                openPromptManager();
+                sel.value = "";
+                return;
+            }
+
+            // 选中提示词，追加到输入框
+            let prompts = JSON.parse(localStorage.getItem('hub_saved_prompts') || '[]');
+            const targetPrompt = prompts[parseInt(val)];
+            if (targetPrompt) {
+                const promptInput = document.getElementById('prompt');
+                promptInput.value = promptInput.value + (promptInput.value ? '\n' : '') + targetPrompt.content;
+                autoResize(promptInput);
+                promptInput.focus();
+            }
+            sel.value = ""; 
+        }
+
+        // --- 以下为弹窗控制核心函数 ---
+        function openPromptManager() {
+            document.getElementById('promptManagerModal').style.display = 'flex';
+            renderPromptManagerList();
+        }
+
+        function closePromptManager() {
+            document.getElementById('promptManagerModal').style.display = 'none';
+        }
+
+        function renderPromptManagerList() {
+            const listContainer = document.getElementById('promptManagerList');
+            let prompts = JSON.parse(localStorage.getItem('hub_saved_prompts') || '[]');
+            
+            if (prompts.length === 0) {
+                listContainer.innerHTML = '<div class="prompt-empty">暂无保存的提示词</div>';
+                renderPromptLibrary(); // 若全删光，顺便刷新外部下拉框隐藏管理选项
+                return;
+            }
+
+            let html = '';
+            prompts.forEach((p, idx) => {
+                html += `
+                    <div class="prompt-item">
+                        <div class="prompt-item-title" title="${p.content}">${p.title}</div>
+                        <div class="prompt-delete-btn" onclick="deletePromptItem(${idx})">删除</div>
+                    </div>
+                `;
+            });
+            listContainer.innerHTML = html;
+        }
+
+        function deletePromptItem(idx) {
+            let prompts = JSON.parse(localStorage.getItem('hub_saved_prompts') || '[]');
+            prompts.splice(idx, 1);
+            localStorage.setItem('hub_saved_prompts', JSON.stringify(prompts));
+            renderPromptManagerList(); // 刷新弹窗内部列表
+            renderPromptLibrary();     // 同步刷新外部主界面的下拉框
+        }
+
+        // --- 文件导入与解析核心逻辑 ---
+        function importPrompts(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const content = e.target.result.trim();
+                    if (!content) {
+                        alert("⚠️ 文件内容为空！");
+                        return;
+                    }
+                    
+                    // 核心逻辑：直接取文件全量内容，去掉后缀名作为标题
+                    const title = file.name.replace(/\.[^/.]+$/, "");
+                    const newPrompt = { title: title, content: content };
+
+                    let existing = JSON.parse(localStorage.getItem('hub_saved_prompts') || '[]');
+                    const isDuplicate = existing.some(p => p.content === newPrompt.content);
+
+                    if (!isDuplicate) {
+                        existing.push(newPrompt);
+                        localStorage.setItem('hub_saved_prompts', JSON.stringify(existing));
+                        renderPromptLibrary();
+                        alert(`✅ 成功导入提示词：${title}`);
+                    } else {
+                        alert('ℹ️ 该提示词内容已存在，无需重复导入。');
+                    }
+                } catch (err) {
+                    alert('❌ 读取文件失败。');
+                }
+            };
+            reader.readAsText(file);
+            event.target.value = ''; // 重置 file input，允许重复导入相同文件
+        }
+
+    </script>
+</body>
+</html>
